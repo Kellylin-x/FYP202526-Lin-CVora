@@ -1,19 +1,14 @@
 import React from 'react';
-import { FileText } from 'lucide-react';
+import CVoraLogo from '../assets/CVoraLOGO.png';
 
 export const Header: React.FC = () => {
     return (
         <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-20">
+                <div className="flex justify-between items-center h-24">
                     {/* Logo Section */}
                     <div className="flex-shrink-0 flex items-center gap-2 cursor-pointer">
-                        <div className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center text-white shadow-lg">
-                            <FileText size={24} strokeWidth={2.5} />
-                        </div>
-                        <span className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-dark to-secondary-dark font-sans tracking-tight">
-                            CVora
-                        </span>
+                        <img src={CVoraLogo} alt="CVora Logo" className="h-48 w-48 object-contain" />
                     </div>
 
                     {/* Navigation Links */}
