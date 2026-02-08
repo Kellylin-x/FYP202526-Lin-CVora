@@ -27,3 +27,13 @@
 - Defined branch naming convention: feat/, fix/, chore/, docs/, test/, refactor/, ci/, hotfix/
 - Created feature branch feat/branching-ci-setup for this setup task
 - Planning: add pytest tests for backend, vitest tests for frontend, GitHub Actions CI workflow
+
+### Backend Tests:  PASSED
+- pytest installed and configured
+- 2/2 tests passing (test_health_check, test_app_is_running)
+- All backend requirements.txt dependencies working
+
+### Frontend Tests:  IN PROGRESS
+- vitest installed with --legacy-peer-deps flag (React 19 / @testing-library/react v15 compatibility issue)
+- Frontend dependencies installed successfully
+- Ready to run npm test -- --run

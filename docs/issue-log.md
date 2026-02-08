@@ -15,3 +15,11 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Status:** ✅ Resolved
 - **Notes:** Added before pushing main and feature branch to new remote
 
+
+### Issue #2: npm ERESOLVE dependency conflict
+- **Date:** 8 Feb 2026
+- **Description:** npm install failed: @testing-library/react@15 requires React 18 but React 19 is installed
+- **Root Cause:** Version mismatch in peer dependencies
+- **Fix Applied:** Ran npm install --legacy-peer-deps
+- **Status:**  Resolved
+- **Notes:** Frontend can now run tests with vitest; may upgrade @testing-library/react later for React 19 native support
