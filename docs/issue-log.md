@@ -23,3 +23,12 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Fix Applied:** Ran npm install --legacy-peer-deps
 - **Status:**  Resolved
 - **Notes:** Frontend can now run tests with vitest; may upgrade @testing-library/react later for React 19 native support
+
+### Issue #3: Missing jsdom dependency for vitest
+- **Date:** 8 Feb 2026
+- **Description:** GitHub Actions CI failed on frontend tests with error: 'Cannot find dependency jsdom'
+- **Root Cause:** vitest.config.ts specifies environment: 'jsdom' but jsdom was not added to package.json devDependencies
+- **Fix Applied:** Added jsdom@^24.0.0 to frontend/package.json devDependencies and ran npm install --legacy-peer-deps
+- **Status:**  Resolved
+- **Local Test Result:** 2/2 frontend tests now passing
+- **Notes:** jsdom is required by vitest to provide DOM/browser API in test environment

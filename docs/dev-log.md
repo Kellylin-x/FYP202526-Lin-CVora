@@ -37,3 +37,9 @@
 - vitest installed with --legacy-peer-deps flag (React 19 / @testing-library/react v15 compatibility issue)
 - Frontend dependencies installed successfully
 - Ready to run npm test -- --run
+
+### Tests Fixed & Verified (8 Feb 2026)
+- **Issue #3 Resolved:** Added jsdom to frontend devDependencies
+- **Backend Tests:**  2/2 PASSED (test_health_check, test_app_is_running)
+- **Frontend Tests:**  2/2 PASSED (should render without crashing, should render the application)
+- **All tests passing locally** - ready for GitHub Actions CI re-run
