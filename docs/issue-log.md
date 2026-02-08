@@ -32,3 +32,11 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Status:**  Resolved
 - **Local Test Result:** 2/2 frontend tests now passing
 - **Notes:** jsdom is required by vitest to provide DOM/browser API in test environment
+
+### Issue #4: GitHub Actions npm install ERESOLVE failure
+- **Date:** 8 Feb 2026
+- **Description:** GitHub Actions CI job 'frontend-tests' failed during npm install with ERESOLVE peer dependency error
+- **Root Cause:** npm install in CI was running without --legacy-peer-deps flag; this flag is needed for React 19 + @testing-library/react v15 compatibility
+- **Fix Applied:** Updated .github/workflows/tests.yml to run 'npm install --legacy-peer-deps' in the frontend-tests job
+- **Status:**  Fixed and pushed - CI will re-run automatically
+- **Notes:** Local environment uses --legacy-peer-deps; CI must use the same flag to avoid peer dependency resolution failures

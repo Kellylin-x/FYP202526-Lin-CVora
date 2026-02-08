@@ -43,3 +43,9 @@
 - **Backend Tests:**  2/2 PASSED (test_health_check, test_app_is_running)
 - **Frontend Tests:**  2/2 PASSED (should render without crashing, should render the application)
 - **All tests passing locally** - ready for GitHub Actions CI re-run
+
+### GitHub Actions CI Fix (8 Feb 2026)
+- **Issue #4:** npm install failing in CI without --legacy-peer-deps
+- **Action:** Updated .github/workflows/tests.yml to include --legacy-peer-deps flag
+- **Next:** CI will re-run automatically with the corrected workflow
+- **Expected Result:** Both backend-tests  and frontend-tests  should now PASS

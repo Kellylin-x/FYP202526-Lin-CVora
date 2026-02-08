@@ -66,3 +66,15 @@ Each entry documents the plan for implementing a prompt/task before execution. T
  **Remaining:**
 - Commit all changes to feat/branching-ci-setup
 - Push feature branch and verify CI runs on GitHub
+
+## Issue #3 Fix & CI Re-run (8 Feb 2026)
+
+ **Resolved:**
+- Issue #3: Missing jsdom dependency identified and fixed
+- Frontend tests: Now passing (2/2)
+- Backend tests: Passing (2/2)
+- All changes committed and pushed to feat/branching-ci-setup
+
+ **Waiting For:**
+- GitHub Actions CI to re-run with fixed dependencies
+- Expected result: Both backend-tests and frontend-tests should PASS
