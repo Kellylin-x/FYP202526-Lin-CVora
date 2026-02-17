@@ -12,9 +12,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to CVora API"}
+
 
 @app.get("/health")
 def health_check():
