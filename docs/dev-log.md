@@ -49,3 +49,34 @@
 - **Action:** Updated .github/workflows/tests.yml to include --legacy-peer-deps flag
 - **Next:** CI will re-run automatically with the corrected workflow
 - **Expected Result:** Both backend-tests  and frontend-tests  should now PASS
+
+## 17 Feb 2026
+- Reorganized the backend into a package layout under `backend/app/`. Added lightweight placeholders for models, services, and API routes, and moved `main.py` into `backend/app/main.py`.
+- Created and activated the backend virtual environment at `backend/.venv`, upgraded `pip`, and installed dependencies from `backend/requirements.txt` (installed packages include `fastapi`, `uvicorn`, `pytest`, `httpx`, `pydantic`, and other required packages).
+- Verified the FastAPI application runs locally and serves the following endpoints:
+	- `GET /` — returns a welcome message
+	- `GET /health` — returns service health status
+	- Interactive docs available at `/docs`
+- CORS configured to allow the frontend at `http://localhost:5173`.
+- Added placeholder modules:
+	- `backend/app/models/cv_models.py` (simple `CVContact`, `CVData` models)
+	- `backend/app/services/cv_parser.py`, `ai_service.py`, `keyword_matcher.py` (stubs/placeholders)
+	- `backend/app/api/cv_routes.py` (sample endpoint)
+
+
+- Ran backend tests with `pytest` in `backend/` after the restructure. Initial test run failed because tests imported `app` from the old module path (`from main import app`).
+- **Issue encountered:** tests failed due to import path `from main import app` after moving `main.py` into `backend/app/main.py`.
+- **Fix applied:** Updated `backend/tests/test_main.py` to `from app.main import app` and re-ran `pytest`.
+- Result: `2 passed` — tests now pass successfully.
+
+Next steps:
+- Expand Pydantic models to represent full CV structure.
+- Implement real parsing and AI integration in `services/` (replace stubs with production logic).
+- Add backend tests for new modules and endpoints.
+- Update any imports across the repo that reference the old `backend.main` module path.
+
+## 17 Feb 2026
+- Restructured backend into a package layout under `backend/app/` and added lightweight placeholders for models, services, and API routes. Moved `main.py` into `backend/app/main.py` and updated repository branch `feat/branching-ci-setup`.
+- Created `models/cv_models.py`, `services/{cv_parser,ai_service,keyword_matcher}.py`, `api/cv_routes.py`, and `utils/__init__.py` as starting points.
+- Next: update any imports that referenced `backend.main` and extend the service implementations.
+
