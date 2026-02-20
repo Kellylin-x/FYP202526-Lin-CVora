@@ -1,7 +1,3 @@
-from email.mime import text
-from logging import info
-from multiprocessing.util import info
-
 import PyPDF2
 from docx import Document
 import re
