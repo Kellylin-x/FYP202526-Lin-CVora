@@ -1,3 +1,7 @@
+from email.mime import text
+from logging import info
+from multiprocessing.util import info
+
 import PyPDF2
 from docx import Document
 import re
@@ -182,13 +186,58 @@ class CVParser:
                 info['full_name'] = line
                 break
         
-        # Extract location (look for city, country patterns)
-        location_pattern = r'\b(Dublin|Cork|Galway|Limerick|Belfast|London|Manchester|Edinburgh|Glasgow|Birmingham|Leeds),?\s*(Ireland|UK|United Kingdom|England|Scotland|Wales|Northern Ireland)?\b'
-        location_match = re.search(location_pattern, text, re.IGNORECASE)
-        if location_match:
-            info['location'] = location_match.group(0)
-        
+        # Extract location (flexible, international-friendly)
+        location = None
+
+        # Method 1: Look for labeled location (most flexible)
+        location_labels = [
+            r'Location:\s*(.+?)(?:\n|Email|Phone|$)',
+            r'Address:\s*(.+?)(?:\n|Email|Phone|$)',
+            r'City:\s*(.+?)(?:\n|Email|Phone|$)',
+            r'Based in:\s*(.+?)(?:\n|Email|Phone|$)',
+        ]
+
+        for pattern in location_labels:
+            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+            if match:
+                location = match.group(1).strip()
+                # Clean up any extra whitespace or newlines
+                location = ' '.join(location.split())
+                break
+         
+        # Method 2: Pattern matching for "City, Country" (case-insensitive)
+        if not location:
+            # Try to find any "Word, Word" pattern that looks like a location
+            city_country = re.search(
+                r'\b([A-Za-z\s]+),\s*([A-Za-z\s]+?)(?:\n|Phone|Email|$)',
+                text,
+                re.MULTILINE
+            )
+    
+            if city_country:
+                city = city_country.group(1).strip().title()
+                country = city_country.group(2).strip().title()
+                location = f"{city}, {country}"
+
+        # Method 3: Look for known patterns near start of CV
+        if not location:
+            # Sometimes location is just listed near the top without label
+            lines = text.split('\n')[:5]  # Check first 5 lines
+            for line in lines:
+                # Skip if line looks like name or email
+                if '@' in line or len(line) < 3:
+                    continue
+                # If line has a comma, might be "City, Country"
+                if ',' in line:
+                    parts = line.split(',')
+                    if len(parts) == 2:
+                        location = f"{parts[0].strip().title()}, {parts[1].strip().title()}"
+                        break
+
+        info['location'] = location
+
         return info
+
     
     def _identify_section_boundaries(self, text: str) -> Dict[str, str]:
         """
