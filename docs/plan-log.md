@@ -233,38 +233,106 @@ Full API endpoint implementation with proper error handling:
 
 ---
 
-## Testing Progress Update (27 Feb 2026)
-
-**Phase 6 Status Update:**
-
-**Completed:**
-- ✅ Unit tests for cv_models.py (15 tests) - All passing
-- ✅ Total tests: 17 (2 health + 15 models)
-
-**Current Testing Breakdown:**
-1. **test_main.py:** 2 tests (health checks)
-2. **test_cv_models.py:** 15 tests (data model validation)
-   - PersonalInfo: 4 tests
-   - Experience: 2 tests
-   - Skills: 2 tests
-   - CVData: 2 tests
-   - EnhanceRequest: 2 tests
-   - JobAnalysisRequest: 3 tests
-
-**Next Steps:**
-- Unit tests for cv_parser.py (sample PDFs/DOCX)
-- Unit tests for ai_service.py (mocked OpenAI)
-- Unit tests for keyword_matcher.py
-- Integration tests for cv_routes.py
-- Target: 70%+ code coverage
-
-**Timeline:**
-- Feb 27: ✅ Model tests complete
-- Feb 28-Mar 1: Service tests
-- Mar 2: Integration tests
-- Mar 3+: Frontend development with tested backend
-
 ---
+
+## Testing Progress Update (20-21 Feb 2026)
+
+**Phase 6: Testing 🧪 IN PROGRESS**
+
+**Status:** ⏳ Unit tests in progress - models and parser complete
+
+**Completed (20 Feb 2026):**
+- ✅ Test framework setup (pytest)
+- ✅ FastAPI TestClient integration
+- ✅ Health check verification (2 tests)
+- ✅ **Unit tests for cv_models.py (15 tests) - COMPLETE**
+  - PersonalInfo validation (4 tests)
+  - Experience model (2 tests)
+  - Skills model (2 tests)
+  - CVData complete structure (2 tests)
+  - EnhanceRequest API model (2 tests)
+  - JobAnalysisRequest API model (3 tests)
+  - All tests passing (15/15)
+  - Test file: `backend/tests/test_cv_models.py`
+
+**Completed (20 Feb 2026 - Continued):**
+- ✅ **Unit tests for cv_parser.py (12 tests) - COMPLETE**
+  - PDF parsing validation (1 test)
+  - DOCX parsing validation (1 test)
+  - Email extraction (1 test)
+  - Phone number extraction (1 test)
+  - Name extraction (1 test)
+  - Location extraction with international support (1 test)
+  - Skills detection (1 test)
+  - Education detection (1 test)
+  - Experience detection (1 test)
+  - Warning system validation (1 test)
+  - Error handling for missing files (1 test)
+  - PDF/DOCX consistency check (1 test)
+  - All tests passing (12/12)
+  - Test file: `backend/tests/test_cv_parser.py`
+  - Test fixtures: `backend/tests/fixtures/sample_cv.txt`
+  - Uses real student CV data for authentic validation
+  - Auto-generates PDF/DOCX files using ReportLab and python-docx
+
+**Parser Enhancement (20 Feb 2026):**
+- ✅ **International Location Support:**
+  - Refactored location extraction from hardcoded cities to flexible pattern matching
+  - Three-method fallback: labeled, pattern-based, contextual
+  - Auto-capitalization for any input format
+  - Now supports international candidates (Mumbai, Beijing, New York, etc.)
+  - Maintains UK/Ireland market focus while being globally inclusive
+  - All parser tests still passing after enhancement
+
+**Current Progress:**
+- Total tests: 29 passing (2 health + 15 models + 12 parser)
+- Execution time: ~1.5 seconds
+- No blocking issues
+- Dependencies added: reportlab (for PDF generation in tests)
+
+**In Progress (Feb 21-24):**
+- ⏳ Unit tests for ai_service.py (Feb 21-22)
+  - Mock OpenAI API calls
+  - Test bullet point enhancement logic
+  - Test confidence scoring algorithm
+  - Test validation and error handling
+  - Test STAR method prompting
+- ⏳ Unit tests for keyword_matcher.py (Feb 23)
+  - Test keyword extraction
+  - Test match score calculation
+  - Test ATS compatibility checking
+  - Test recommendations generation
+  - Verify 100+ STEM keyword database
+- ⏳ Integration tests for cv_routes.py (Feb 24-25)
+  - Test CV upload endpoint end-to-end
+  - Test enhancement endpoint with mocked AI
+  - Test job analysis endpoint
+  - Test error handling across all routes
+  - Test file upload validation (size, type)
+
+**Target:**
+- 70%+ code coverage across all backend services
+- All core functionality tested
+- Integration tests for complete workflows
+- Aim for 50+ total tests by Feb 25
+
+**Files:**
+- ✅ `backend/tests/test_main.py` (2 tests passing)
+- ✅ `backend/tests/test_cv_models.py` (15 tests passing) - COMPLETE
+- ✅ `backend/tests/test_cv_parser.py` (12 tests passing) - COMPLETE
+- ✅ `backend/tests/fixtures/sample_cv.txt` - Real CV test data
+- ⏳ `backend/tests/test_ai_service.py` (planned - Feb 21-22)
+- ⏳ `backend/tests/test_keyword_matcher.py` (planned - Feb 23)
+- ⏳ `backend/tests/test_cv_routes.py` (planned - Feb 24-25)
+
+**Timeline Update:**
+- Feb 20: ✅ Data model tests complete (15 tests)
+- Feb 20: ✅ CV parser tests complete (12 tests)
+- Feb 20: ✅ International location support implemented
+- Feb 21-22: AI service tests (mock OpenAI)
+- Feb 23: Keyword matcher tests
+- Feb 24-25: Integration tests for API routes
+- Feb 26+: Begin frontend development with fully tested backend
 
 ## Timeline & Milestones
 

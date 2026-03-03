@@ -171,7 +171,7 @@
 - Modular architecture for maintainability and testing
 - Following Python package best practices
 - Virtual environment ensures dependency isolation
-- All code properly typed with Python type hints
+- All codse properly typed with Python type hints
 
 ## 18 Feb 2026
 
@@ -330,3 +330,326 @@
 - Frontend component development
 - Frontend-backend API integration
 - PDF export functionality and user evaluation
+
+## 20 Feb 2026
+
+### Unit Testing Implementation - Phase 6 Started
+
+Following supervisor feedback from our February 19th meeting, began implementing comprehensive unit and integration tests for the backend before starting frontend development.
+
+**Supervisor Recommendation:**
+- "Implement unit tests and integration tests for each feature"
+- Rationale: Catch backend bugs early, ensure API stability, demonstrate software engineering best practices
+
+**Decision Made:**
+- Implement tests NOW before frontend (not after)
+- Benefits: Better code confidence, easier frontend development, professional approach
+
+### Unit Tests for CV Data Models (test_cv_models.py)
+
+**Created:** `backend/tests/test_cv_models.py` with 15 comprehensive unit tests
+
+**Test Coverage:**
+
+1. **TestPersonalInfo (4 tests):**
+   - `test_valid_personal_info` - Validates correct PersonalInfo creation
+   - `test_invalid_email` - Ensures invalid emails are rejected
+   - `test_missing_required_field` - Confirms required fields are enforced
+   - `test_optional_fields` - Verifies optional fields (linkedin, github, website) work correctly
+
+2. **TestExperience (2 tests):**
+   - `test_valid_experience` - Valid experience entry with all fields
+   - `test_empty_lists_allowed` - Confirms empty responsibilities/achievements/technologies are permitted
+
+3. **TestSkills (2 tests):**
+   - `test_valid_skills` - Both technical and soft skills populated
+   - `test_empty_skills_allowed` - Default empty lists work correctly
+
+4. **TestCVData (2 tests):**
+   - `test_minimal_cv_data` - Minimal required fields only
+   - `test_complete_cv_data` - Full CV with all sections populated
+
+5. **TestEnhanceRequest (2 tests):**
+   - `test_valid_enhance_request` - Valid API request for enhancement
+   - `test_text_too_short` - Rejects text under 5 characters
+
+6. **TestJobAnalysisRequest (3 tests):**
+   - `test_valid_job_analysis_request` - Valid job description (50+ chars)
+   - `test_job_description_too_short` - Rejects job descriptions under 50 chars
+   - `test_with_cv_text` - Optional CV text field works correctly
+
+**Testing Approach:**
+- Organize tests into logical classes by model type
+- Test both success cases (valid data) and failure cases (invalid data)
+- Use `pytest.raises(ValidationError)` for testing Pydantic validation
+- Follow Arrange-Act-Assert pattern
+- Descriptive test names explaining what is tested
+
+**Test Results:**
+```
+======================== 15 passed, 6 warnings in 1.58s ==========================
+```
+
+- ✅ All 15 new tests passing
+- ✅ Total: 17 tests (2 existing + 15 new)
+- ⚠️ 6 Pydantic deprecation warnings (class-based Config deprecated in v3.0) - non-blocking
+- ✅ No test failures or errors
+- ✅ Execution time: ~1.5 seconds
+
+**Technical Implementation:**
+- Test file: 270+ lines of comprehensive test code
+- Framework: pytest with Pydantic ValidationError testing
+- Coverage: All data models in `cv_models.py`
+- Pattern: Class-based test organization with descriptive method names
+
+### Current Testing Status
+
+**Completed:**
+- ✅ Basic health check tests (2 tests from Feb 8)
+- ✅ CV data models unit tests (15 tests) - NEW
+
+**Total Test Count:** 17 passing
+
+**Next Steps (Week 2):**
+1. Unit tests for `cv_parser.py` (with sample PDF/DOCX files)
+2. Unit tests for `ai_service.py` (mocked OpenAI API)
+3. Unit tests for `keyword_matcher.py` (keyword extraction, scoring)
+4. Integration tests for `cv_routes.py` (API endpoints end-to-end)
+5. Target: 70%+ code coverage
+
+### Why Tests Before Frontend
+
+**Strategic Decision Benefits:**
+- ✅ Catch backend bugs NOW rather than during frontend integration
+- ✅ Confidence in API contracts before building UI
+- ✅ Easier debugging (know if issue is frontend or backend)
+- ✅ Professional software engineering practice for project evaluation
+- ✅ Addresses supervisor feedback immediately
+
+**Timeline Impact:**
+- Testing: 2-3 days (Feb 27 - Mar 1)
+- Then frontend with confidence: Week 2-3
+- No time lost - actually saves debugging time later
+
+### Technical Notes
+
+**Pydantic Deprecation Warnings:**
+- Warning: "Support for class-based `config` is deprecated, use ConfigDict instead"
+- Impact: None currently (we're on Pydantic v2.0)
+- Action: Will update to ConfigDict syntax in future refactor
+- Not blocking tests or functionality
+
+**Test Organization:**
+- Each model type has its own test class
+- Tests grouped logically (valid data, invalid data, edge cases)
+- Easy to extend with more tests
+- Clear documentation of what each test validates
+
+## 20 Feb 2026 (Continued - Afternoon)
+
+### CV Parser Unit Tests Implementation
+
+**Created:** `backend/tests/test_cv_parser.py` with 12 comprehensive unit tests
+
+**Test Infrastructure:**
+- Created `backend/tests/fixtures/` directory with `sample_cv.txt` (real student CV)
+- Tests auto-generate PDF/DOCX files using ReportLab and python-docx
+- Automatic cleanup of temporary test files
+
+**Test Coverage (12 tests):**
+- PDF/DOCX parsing (2 tests)
+- Personal info extraction: email, phone, name, location, skills (5 tests)
+- Section detection: education, experience (2 tests)
+- Error handling and validation (3 tests)
+
+**Test Results:** ✅ 12/12 passing | **Total Tests:** 29 (2 health + 15 models + 12 parser)
+
+**Dependencies Added:** `reportlab` for PDF test file generation
+
+### International Inclusivity Enhancement
+
+**Issue Identified:** Location extraction used hardcoded UK/Ireland cities, potentially excluding international candidates.
+
+**Solution Implemented:** Refactored location extraction with 3-method flexible approach:
+1. Label-based: "Location:", "Address:", "City:", "Based in:"
+2. Pattern matching: "City, Country" with auto-capitalization
+3. Contextual detection in first 5 CV lines
+
+**Now Handles:**
+- ✅ "dublin, ireland" → "Dublin, Ireland" (auto-capitalizes)
+- ✅ "Mumbai, India" (international locations)
+- ✅ "LONDON, UK" → "London, Uk" (any format)
+- ✅ Multi-word cities: "New York, USA"
+
+**Design Decision:** System welcomes international candidates while maintaining UK/Ireland market focus. Location flexibility improves user experience without compromising project scope.
+
+**All tests still passing after refactor.**
+
+## 3 March 2026 (Very early morning)
+
+### Committed + Pushed Unit Tests to Github
+- Went to London 21st-23rd February & forgot to commit previous changes.
+- Adjusted the commit date to reflect when I actually wrote the code.
+- 24th-1st Feb: Tonsillitis 
+
+## 3 March 2026 (continued)
+
+### AI Service Unit Tests Implementation
+
+**Context:** Resuming testing work after travel to London (Feb 21-23) and recovery from tonsillitis (Feb 25 - Mar 1). Continuing Phase 6 testing implementation.
+
+Following the completion of CV parser tests on Feb 20, implemented comprehensive unit tests for the AI enhancement service with mocked OpenAI API calls.
+
+**Created:** `backend/tests/test_ai_service.py` with 10 comprehensive unit tests
+
+**Testing Approach - Mocking External APIs:**
+- Used pytest fixtures to create fresh AIService instances for each test
+- Mocked OpenAI client to avoid real API calls during testing
+- Tests run in isolation without internet connectivity or API costs
+- Each test creates predictable mock responses to verify logic
+
+**Test Coverage - AI Service (10 tests):**
+
+1. **Success Cases (3 tests):**
+   - `test_enhance_bullet_point_success` - Validates successful enhancement with proper return format
+   - `test_enhance_bullet_point_with_metrics` - Verifies detection of measurable results (numbers, percentages)
+   - `test_confidence_scoring_with_action_verb` - Confirms action verb detection (Developed, Led, etc.)
+
+2. **Validation & Cleaning (3 tests):**
+   - `test_enhance_bullet_point_validates_output` - Rejects AI responses containing error messages
+   - `test_cleans_ai_output` - Removes quotes, markdown, and formatting artifacts from responses
+   - `test_validates_length_appropriate` - Rejects responses exceeding 200 character limit
+
+3. **Error Handling (2 tests):**
+   - `test_handles_api_error_gracefully` - Returns original text when OpenAI API fails
+   - `test_handles_missing_api_key` - Provides clear error message when API key not configured
+
+4. **Quality Metrics (2 tests):**
+   - `test_detects_measurable_results` - Validates regex detection of numbers and metrics
+   - `test_rejects_text_too_short` - Enforces minimum text length requirement (5+ characters)
+
+**Test Results:**
+```
+======================== 10 passed in 5.32s ==========================
+```
+
+- ✅ All 10 AI service tests passing
+- ✅ Total: 39 tests (2 health + 15 models + 12 parser + 10 AI service)
+- ✅ No real API calls made during testing (all mocked)
+- ✅ Fast execution (~5 seconds for all AI tests)
+
+**Technical Implementation:**
+
+**Mocking Strategy:**
+```python
+@pytest.fixture
+def service_with_mock_client(self):
+    service = AIService(api_key="test-key")
+    mock_client = Mock()
+    service.client = mock_client  # Replace real client with mock
+    return service, mock_client
+```
+
+**Benefits of Mocking:**
+- No API costs during testing (would be $0.002 per test × 10 = $0.02 per run)
+- No internet connection required
+- Predictable test results (no API variability)
+- Fast execution (5s vs 20s with real API)
+- Tests work offline
+
+**What Tests Verify:**
+- STAR method enhancement logic works correctly
+- Confidence scoring algorithm calculates properly (weights: action verb 25%, metrics 35%, length 20%, clarity 20%)
+- Output validation rejects error messages and malformed responses
+- Response cleaning removes markdown, quotes, and bullet points
+- Error handling returns original text with clear error messages
+- Text length validation (min 5 chars, max 200 chars)
+- Measurable results detection via regex pattern matching
+
+**Dependencies:**
+- `pytest-mock==3.15.1` - Enhanced mocking capabilities (already installed)
+
+### Current Testing Status (3 Mar 2026)
+
+**Completed:**
+- ✅ Basic health check tests (2 tests - Feb 8)
+- ✅ CV data models unit tests (15 tests - Feb 20)
+- ✅ CV parser unit tests (12 tests - Feb 20)
+- ✅ AI service unit tests (10 tests - Mar 3) - NEW
+
+**Total Test Count:** 39 passing
+
+**Test Execution Time:** ~7 seconds for all tests
+
+### Keyword Matcher Unit Tests Implementation (3 Mar 2026)
+
+**Created:** `backend/tests/test_keyword_matcher.py` with 15 unit tests
+
+**Key Decision — Tests vs Implementation:**
+Before writing tests, discovered a mismatch between the original test file and the actual `keyword_matcher.py` implementation. Investigated `cv_routes.py` and `cv_models.py` before deciding on a fix:
+- `cv_routes.py` accesses `keywords['all']` directly and passes the full dict to `JobAnalysisResponse`
+- `cv_models.py` defines `extracted_keywords: dict` — explicitly expects a dict
+- Changing `keyword_matcher.py` would have broken both files
+- **Decision:** Update the tests to match the implementation, not the other way around
+
+**Test Coverage (15 tests):**
+- Keyword extraction: from text, case insensitivity, ignores non-STEM words (3 tests)
+- Match score calculation: perfect match, partial match, no match (3 tests)
+- Job vs CV analysis: verifies all returned keys and matched keywords (1 test)
+- ATS compatibility: clean CV, missing sections, missing contact, problematic characters (4 tests)
+- Database coverage, recommendations, empty text, very short CV (4 tests)
+
+**Notable Bug Fixed:**
+Original test had `assert len(extracted) >= 25` — `len()` of a dict always returns 4 (number of keys). Fixed to `assert len(extracted['all']) >= 25`.
+
+**Test Results:**
+```
+======================== 15 passed in 0.62s ==========================
+```
+- ✅ All 15 tests passing
+- ✅ Total: 54 tests (2 health + 15 models + 12 parser + 10 AI + 15 keyword matcher)
+- ✅ No changes made to `keyword_matcher.py` — implementation confirmed correct
+
+### Current Testing Status (3 Mar 2026 - Updated)
+**Completed:**
+- ✅ Basic health check tests (2 tests - Feb 8)
+- ✅ CV data models unit tests (15 tests - Feb 20)
+- ✅ CV parser unit tests (12 tests - Feb 20)
+- ✅ AI service unit tests (10 tests - Mar 3)
+- ✅ Keyword matcher unit tests (15 tests - Mar 3)
+
+**Total Test Count:** 54 passing
+
+**Next Steps (Week 3 - Mar 4-9):**
+2. Integration tests for `cv_routes.py` (API endpoints end-to-end) - Mar 6-8
+3. Target: 50+ tests, 70%+ code coverage by Mar 9
+4. Begin frontend development - Week 4 (Mar 10+)
+
+### Project Timeline Notes
+
+**Feb 21-23:** Travel to London (no development work)  
+**Feb 25 - Mar 1:** Illness (tonsillitis) - project paused  
+**Mar 3:** Resumed work - completed AI service tests  
+**Mar 4-9:** Continue testing phase (keyword matcher, integration tests)  
+**Mar 10+:** Frontend development with fully tested backend  
+
+### Technical Notes
+
+**Why Tests Must Match Implementation:**
+Tests verify the "contract" between code and users - exact key names, data types, and behavior. When code returns `result['enhanced']`, tests must check `result['enhanced']`, not `result['enhanced_text']`. This ensures:
+- Regression prevention (tests catch breaking changes)
+- API contract verification (guarantees return format)
+- Documentation of expected behavior
+- Confidence in refactoring (can safely modify code)
+
+**Mocking vs Real API Calls:**
+- Mocking: Fast, free, deterministic, works offline
+- Real API: Slow, costly, variable results, requires internet
+- For unit tests, always mock external services
+- For integration tests (later), may use real API with test key
+
+**Test Organization:**
+- Each service has its own test file
+- Tests grouped by functionality (success, validation, errors)
+- Fixtures provide reusable test setup
+- Descriptive test names explain what is verified

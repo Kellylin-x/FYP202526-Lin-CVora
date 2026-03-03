@@ -3,7 +3,7 @@
 ## Format
 Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, Notes
 
----
+----------------------------------------------------
 
 ## 8 Feb 2026
 
@@ -15,6 +15,8 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Status:** ✅ Resolved
 - **Notes:** Added before pushing main and feature branch to new remote
 
+---------------------------------------------------------------------
+
 ### Issue #2: npm ERESOLVE dependency conflict
 - **Date:** 8 Feb 2026
 - **Description:** npm install failed: @testing-library/react@15 requires React 18 but React 19 is installed
@@ -22,6 +24,8 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Fix Applied:** Ran `npm install --legacy-peer-deps`
 - **Status:** ✅ Resolved
 - **Notes:** Frontend can now run tests with vitest; may upgrade @testing-library/react later for React 19 native support
+
+----------------------------------------------------------
 
 ### Issue #3: Missing jsdom dependency for vitest
 - **Date:** 8 Feb 2026
@@ -32,6 +36,8 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Local Test Result:** 2/2 frontend tests now passing
 - **Notes:** `jsdom` is required by vitest to provide DOM/browser API in test environment
 
+-----------------------------------------------------------------------------
+
 ### Issue #4: GitHub Actions npm install ERESOLVE failure
 - **Date:** 8 Feb 2026
 - **Description:** GitHub Actions CI job 'frontend-tests' failed during npm install with ERESOLVE peer dependency error
@@ -40,7 +46,7 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Status:** ✅ Fixed and pushed - CI will re-run automatically
 - **Notes:** Local environment uses `--legacy-peer-deps`; CI must use the same flag to avoid peer dependency resolution failures
 
----
+---------------------------------------------------------------
 
 ## 17 Feb 2026
 
@@ -51,6 +57,8 @@ Each entry includes: Date, Issue Description, Root Cause, Fix Applied, Status, N
 - **Fix Applied:** Created `backend/app/` package, added `__init__.py` files, placeholder modules, and moved `main.py` into `backend/app/main.py`.
 - **Status:** ✅ Implemented locally on branch `feat/branching-ci-setup`
 - **Notes:** Placeholder modules created; update imports if any external code depended on `backend.main` module path.
+
+--------------------------------------------------------------
 
 ### Issue #6: Unable to activate `.venv` in PowerShell
 - **Date:** 17 Feb 2026
@@ -69,6 +77,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 - **After activation:** `pip install -r requirements.txt`
+
+--------------------------------------------------------------
 
 ### Issue #7: Tests failing after backend restructure
 - **Date:** 17 Feb 2026
@@ -100,6 +110,8 @@ source .venv/bin/activate
 - **Status:** ✅ Resolved — models now import successfully and tests pass (2/2).
 - **Notes:** Added `email-validator` and `dnspython` to the virtual environment. Consider adding these explicitly to `backend/requirements.txt` for clarity on future setups.
 
+-----------------------------------------------
+
 ### Issue #9: Missing dependencies for CV Parser (PyPDF2, python-docx)
 - **Date:** 18 Feb 2026
 - **Description:** After implementing the comprehensive `CVParser` class and running `pytest`, discovered missing dependencies: `ModuleNotFoundError: No module named 'PyPDF2'` and `ModuleNotFoundError: No module named 'docx'`
@@ -108,6 +120,8 @@ source .venv/bin/activate
 - **Status:** ✅ Resolved — all tests now pass (2/2) with CV parser fully imported and functional.
 - **Verification:** CVParser now successfully imports and pytest passes all tests without errors.
 - **Notes:** Both libraries are critical for CV file handling; ensure they remain in `backend/requirements.txt` for future environment setups.
+
+---------------------------------------------------------------
 
 ### Issue #10: .env file UTF-8 encoding error
 - **Date:** 18 Feb 2026
@@ -130,3 +144,58 @@ source .venv/bin/activate
 - **Testing:** All endpoints verified (200 OK), pytest passing (2/2), API docs complete
 - **Status:** ✅ Backend 100% complete and operational
 - **Next:** Frontend component development and API integration
+
+---
+
+## 20 Feb 2026
+
+### Issue #11: CV Parser Location Extraction - International Inclusivity Concern
+
+- **Date:** 20 Feb 2026
+- **Description:** During CV parser test development, identified that location extraction used hardcoded list of UK/Ireland cities (Dublin, Cork, Galway, etc.), potentially excluding international candidates applying to UK/Ireland jobs
+- **Root Cause:** Initial implementation optimized only for local UK/Ireland locations with explicit city pattern matching: `r'\b(Dublin|Cork|Galway|...),?\s*(Ireland|UK|...)?'`
+- **Impact:** International candidates (e.g., Mumbai, India; Beijing, China; New York, USA) would not have location auto-detected, though CV would still be parsed
+- **Design Discussion:** 
+  - Project scope: UK/Ireland STEM CVs for UK/Ireland market
+  - Use case: ANYONE can use the tool, CVs formatted in UK/Ireland style, targeting UK/Ireland jobs
+  - Question raised: Should system exclude international candidates?
+  - Answer: NO - system should be inclusive while maintaining market focus
+- **Fix Applied:** Refactored `_extract_personal_info()` in `cv_parser.py` with three-method flexible location detection:
+  1. Label-based search ("Location:", "Address:", "City:", "Based in:")
+  2. Pattern matching for "City, Country" with auto-capitalization
+  3. Contextual detection in first 5 lines of CV
+- **Status:** ✅ Resolved
+- **Verification:** 
+  - All 12 CV parser tests passing
+  - Now handles: "dublin, ireland" → "Dublin, Ireland"
+  - Now handles: "Mumbai, India" (international)
+  - Now handles: "LONDON, ENGLAND" → "London, England"
+  - Auto-capitalizes any format (lowercase, UPPERCASE, Title Case)
+- **Lessons Learned:**
+  - Important to consider bias and exclusion in AI systems
+  - MVP scope doesn't mean excluding users outside target market
+  - Flexible parsing is better than rigid pattern matching
+  - International phone numbers already supported via regex (no changes needed)
+- **Notes:** This design decision will be discussed in project report under ethical AI considerations and demonstrates awareness of inclusivity in software design
+
+### No Other Issues Encountered - CV Parser Testing
+
+- **Date:** 20 Feb 2026
+- **Activity:** Implemented 12 unit tests for CV parser service
+- **Status:** ✅ Smooth implementation
+- **Test Results:** 12/12 passing on first run after location flexibility fix
+- **Notes:** 
+  - Used real student CV data for authentic testing
+  - ReportLab and python-docx successfully generate test files
+  - Fixture cleanup working correctly
+  - PyPDF2 and Pydantic deprecation warnings present but non-blocking
+
+---
+
+## Summary (20 Feb 2026)
+
+- **Unit Testing:** Successfully implemented 12 unit tests for CV parser
+- **Design Enhancement:** Made location extraction internationally flexible
+- **Test Results:** 29/29 passing (2 health + 15 models + 12 parser)
+- **Issue Resolved:** International inclusivity concern addressed
+- **Next:** Continue with AI service and keyword matcher unit tests
