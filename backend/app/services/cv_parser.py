@@ -1,3 +1,6 @@
+from email.mime import text
+import keyword
+
 import PyPDF2
 from docx import Document
 import re
@@ -102,6 +105,9 @@ class CVParser:
         
         # Identify section boundaries
         sections = self._identify_section_boundaries(text)
+
+        print("DEBUG sections found:", list(sections.keys()))
+        print("DEBUG experience text:", sections.get('experience', 'NOT FOUND')[:200])
         
         # Extract each section
         experience = self._extract_experience_simple(sections.get('experience', ''))
@@ -247,8 +253,8 @@ class CVParser:
         
         for section_name, keywords in self.section_keywords.items():
             for keyword in keywords:
-                # Look for section header (keyword at start of line or with minimal text before)
-                pattern = r'^[\s\-•]*' + re.escape(keyword) + r'[\s\-:]*$'
+                # NEW - more flexible, allows extra whitespace and doesn't require exact line end
+                pattern = r'(?:^|\n)[\s\-•]*' + re.escape(keyword) + r'[\s\-:]*(?:\n|$)'
                 matches = re.finditer(pattern, text_lower, re.MULTILINE | re.IGNORECASE)
                 
                 for match in matches:
@@ -273,58 +279,58 @@ class CVParser:
         return sections
     
     def _extract_experience_simple(self, text: str) -> List[Dict]:
-        """
-        Simple experience extraction
-        Looks for job titles, companies, and dates
-        """
         if not text:
             return []
-        
+
         experiences = []
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+    
+        # Find date lines — these mark the start of a job entry
+        date_pattern = r'(\d{4})\s*[-–—]\s*(\d{4}|Present|Current)'
+    
+        current_job = None
+        responsibilities = []
+
+        for line in lines[1:]:  # Skip "Experience" header
+            date_match = re.search(date_pattern, line, re.IGNORECASE)
         
-        # Split by double newlines (likely separate jobs)
-        potential_jobs = re.split(r'\n\s*\n', text)
-        
-        for idx, job_text in enumerate(potential_jobs[1:], 1):  # Skip header
-            if len(job_text.strip()) < 20:  # Too short to be a real job
-                continue
-            
-            lines = [l.strip() for l in job_text.split('\n') if l.strip()]
-            if not lines:
-                continue
-            
-            # First line often contains job title and/or company
-            first_line = lines[0] if lines else ""
-            
-            # Look for dates (e.g., "2020 - 2023", "Jan 2020 - Present")
-            date_pattern = r'(\d{4}|[A-Za-z]{3,9}\s+\d{4})\s*[-–—]\s*(\d{4}|[A-Za-z]{3,9}\s+\d{4}|Present|Current)'
-            date_match = re.search(date_pattern, job_text, re.IGNORECASE)
-            
-            start_date = "Unknown"
-            end_date = "Unknown"
             if date_match:
-                start_date = date_match.group(1)
-                end_date = date_match.group(2)
+                # Save previous job if exists
+                if current_job:
+                    current_job['responsibilities'] = responsibilities[:5]
+                    experiences.append(current_job)
+                    responsibilities = []
             
-            # Extract bullet points (lines starting with • - * or similar)
-            responsibilities = []
-            for line in lines:
-                if re.match(r'^[\-•\*]\s+', line) or (line and line[0].isalpha() and len(line) > 20):
-                    cleaned = re.sub(r'^[\-•\*]\s+', '', line)
-                    responsibilities.append(cleaned)
+                # Parse this line for job title and company
+                # Format: "2022 – 2024 Job Title    Company, Location"
+                remainder = re.sub(date_pattern, '', line).strip()
+                parts = re.split(r'\s{3,}', remainder)  # Split on 2+ spaces
             
-            experiences.append({
-                'id': f'exp-{idx}',
-                'job_title': first_line[:100] if first_line else f'Position {idx}',
-                'company': 'Unknown',  # Hard to parse reliably
-                'location': 'Unknown',
-                'start_date': start_date,
-                'end_date': end_date,
-                'responsibilities': responsibilities[:5],  # Limit to 5
-                'achievements': [],
-                'technologies': []
-            })
+                job_title = parts[0].strip() if parts else 'Position'
+                company = parts[1].split(',')[0].strip() if len(parts) > 1 else 'Unknown'
+
+                current_job = {
+                    'id': f'exp-{len(experiences)+1}',
+                    'job_title': job_title,
+                    'company': company,
+                    'location': 'Unknown',
+                    'start_date': date_match.group(1),
+                    'end_date': date_match.group(2),
+                    'responsibilities': [],
+                    'achievements': [],
+                    'technologies': []
+                }
         
+            elif current_job and re.match(r'^[•\-\*]', line):
+                # Bullet point — add as responsibility
+                cleaned = re.sub(r'^[•\-\*]\s*', '', line)
+                responsibilities.append(cleaned)
+    
+        # Don't forget the last job
+        if current_job:
+            current_job['responsibilities'] = responsibilities[:5]
+            experiences.append(current_job)
+    
         return experiences
     
     def _extract_education_simple(self, text: str) -> List[Dict]:
@@ -348,6 +354,14 @@ class CVParser:
             for match in matches:
                 degree_type = match.group(1)
                 field = match.group(2) if len(match.groups()) > 1 else ""
+
+                # Look for institution name near the degree match
+                institution = 'Unknown'
+                # Search for university/college/institute keywords near the degree
+                inst_pattern = r'(University|College|Institute|School)\s+(?:of\s+)?\w+'
+                inst_match = re.search(inst_pattern, text, re.IGNORECASE)
+                if inst_match:
+                    institution = inst_match.group(0).strip()[:60]
                 
                 # Look for year nearby
                 year_pattern = r'20\d{2}'
@@ -357,7 +371,7 @@ class CVParser:
                 education.append({
                     'id': f'edu-{idx}',
                     'degree': f'{degree_type} {field}'.strip(),
-                    'institution': 'Unknown',  # Hard to parse
+                    'institution': institution,  # Hard to parse
                     'location': 'Unknown',
                     'graduation_date': graduation,
                     'grade': None,
