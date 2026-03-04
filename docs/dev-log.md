@@ -653,3 +653,98 @@ Tests verify the "contract" between code and users - exact key names, data types
 - Tests grouped by functionality (success, validation, errors)
 - Fixtures provide reusable test setup
 - Descriptive test names explain what is verified
+
+### CV Routes Integration Tests Implementation (4 Mar 2026)
+
+**Created:** `backend/tests/test_cv_routes.py` with 14 integration tests
+
+**Approach — Integration Testing with Mocking:**
+Integration tests hit the actual FastAPI endpoints using `TestClient` rather than calling
+services directly. External dependencies (cv_parser, ai_service) are mocked at the route
+level so tests verify route logic and HTTP behaviour independently of service internals.
+
+**Key Decision — Mock cv_parser for Upload Tests:**
+Initial upload tests returned 500 because the cv_parser couldn't build a valid `CVData`
+object from minimal generated PDFs — `PersonalInfo` has required fields (full_name, email,
+phone, location) that wouldn't be extracted from 3 lines of text. Solution: patch
+`app.api.cv_routes.cv_parser` and return a pre-built mock CVData object, testing the
+route's file handling logic without depending on parser success.
+
+**Test Coverage (14 tests across 4 classes):**
+
+1. **TestCVUploadEndpoint (5 tests):**
+   - `test_upload_valid_pdf` — PDF upload returns 200 with parsed_data and warnings
+   - `test_upload_valid_docx` — DOCX upload returns 200 with parsed_data
+   - `test_upload_invalid_file_type` — .txt file rejected with 400 and detail message
+   - `test_upload_no_filename` — empty filename rejected with 400 or 422
+   - `test_upload_returns_warnings_for_incomplete_cv` — warnings list returned for minimal CV
+
+2. **TestEnhanceBulletEndpoint (4 tests):**
+   - `test_enhance_bullet_success` — returns 200 with original, enhanced, confidence, improvements
+   - `test_enhance_bullet_text_too_short` — text under 5 chars rejected with 422 (Pydantic)
+   - `test_enhance_bullet_text_too_long` — text over 500 chars rejected with 400 (route logic)
+   - `test_enhance_bullet_ai_service_error` — AI service error returns 503
+
+3. **TestJobAnalysisEndpoint (4 tests):**
+   - `test_analyze_job_keywords_only` — no CV text returns keywords only, null match fields
+   - `test_analyze_job_with_cv_comparison` — with CV text returns match score and keywords
+   - `test_analyze_job_description_too_short` — under 50 chars rejected with 422
+   - `test_analyze_job_returns_keyword_dict` — extracted_keywords is dict with 'all' key
+
+4. **TestHealthEndpoint (1 test):**
+   - `test_cv_routes_health` — returns 200 with status and routes list
+
+**Test Results:**
+```
+======================== 14 passed in 4.21s ==========================
+```
+
+- ✅ All 14 integration tests passing
+- ✅ Total: 68 tests (2 health + 15 models + 12 parser + 10 AI + 15 keyword matcher + 14 routes)
+- ✅ No changes to production code required
+- ✅ Pushed to GitHub on feat/backend-implementation branch
+
+### Current Testing Status (3 Mar 2026 - COMPLETE)
+
+**All backend testing phases complete:**
+- ✅ Basic health check tests (2 tests - Feb 8)
+- ✅ CV data models unit tests (15 tests - Feb 20)
+- ✅ CV parser unit tests (12 tests - Feb 20)
+- ✅ AI service unit tests (10 tests - Mar 3)
+- ✅ Keyword matcher unit tests (15 tests - Mar 3)
+- ✅ CV routes integration tests (14 tests - Mar 4)
+
+**Total Test Count:** 68 passing
+**Backend testing phase: COMPLETE — ready to begin frontend development**
+
+## 3-4 Mar 2026 (continued) - Parser Fixes
+
+### CV Parser Bug Fixes (identified during frontend integration)
+
+**Issues identified when uploading real CV via frontend:**
+- Experience section not detected despite being present in PDF
+- Institution name showing as "Unknown" for education entries
+- Institution regex capturing too much text (degree name included)
+
+**Fixes Applied:**
+
+`_identify_section_boundaries()`:
+- Old regex `^[\s\-•]*keyword[\s\-:]*$` was too strict
+- PyPDF2 sometimes merges lines or adds whitespace, causing exact match to fail
+- New pattern uses `(?:^|\n)` and `(?:\n|$)` for flexible newline matching
+- Experience section now correctly identified
+
+`_extract_experience_simple()`:
+- Old method split on double newlines (`\n\s*\n`) but PDF text had single newlines with spaces
+- Rewrote to detect date patterns (`2022 – 2024`) as job entry markers
+- Splits remainder on 3+ spaces to separate job title from company
+- Now correctly extracts: "Receptionist & Admin" at "Aura"
+
+`_extract_education_simple()`:
+- Added institution extraction using regex for University/College/Institute/School keywords
+- Refined pattern to `\w+(?:\s+\w+){0,3}` then tightened to single `\w+` to avoid over-capturing
+- Now correctly extracts: "University of Galway"
+
+**Verification:**
+- All 68 tests still passing after fixes
+- Real CV upload confirmed working end-to-end via frontend

@@ -235,11 +235,11 @@ Full API endpoint implementation with proper error handling:
 
 ---
 
-## Testing Progress Update (20-21 Feb 2026)
+## Testing Progress Update (20 Feb - 3 Mar 2026)
 
 **Phase 6: Testing 🧪 IN PROGRESS**
 
-**Status:** ⏳ Unit tests in progress - models and parser complete
+**Status:** ⏳ Unit tests in progress - models, parser, and AI service complete
 
 **Completed (20 Feb 2026):**
 - ✅ Test framework setup (pytest)
@@ -257,236 +257,200 @@ Full API endpoint implementation with proper error handling:
 
 **Completed (20 Feb 2026 - Continued):**
 - ✅ **Unit tests for cv_parser.py (12 tests) - COMPLETE**
-  - PDF parsing validation (1 test)
-  - DOCX parsing validation (1 test)
-  - Email extraction (1 test)
-  - Phone number extraction (1 test)
-  - Name extraction (1 test)
-  - Location extraction with international support (1 test)
-  - Skills detection (1 test)
-  - Education detection (1 test)
-  - Experience detection (1 test)
-  - Warning system validation (1 test)
-  - Error handling for missing files (1 test)
-  - PDF/DOCX consistency check (1 test)
+  - PDF/DOCX parsing validation (2 tests)
+  - Personal info extraction (5 tests: email, phone, name, location, skills)
+  - Section detection (2 tests: education, experience)
+  - Error handling and validation (3 tests)
   - All tests passing (12/12)
   - Test file: `backend/tests/test_cv_parser.py`
   - Test fixtures: `backend/tests/fixtures/sample_cv.txt`
   - Uses real student CV data for authentic validation
   - Auto-generates PDF/DOCX files using ReportLab and python-docx
+  - Enhanced location extraction for international support
 
-**Parser Enhancement (20 Feb 2026):**
-- ✅ **International Location Support:**
-  - Refactored location extraction from hardcoded cities to flexible pattern matching
-  - Three-method fallback: labeled, pattern-based, contextual
-  - Auto-capitalization for any input format
-  - Now supports international candidates (Mumbai, Beijing, New York, etc.)
-  - Maintains UK/Ireland market focus while being globally inclusive
-  - All parser tests still passing after enhancement
+**Timeline Break:**
+- **Feb 21-23:** Travel to London (no development work)
+- **Feb 25 - Mar 1:** Illness (tonsillitis) - project paused
+- **Mar 3:** Resumed testing work
 
-**Current Progress:**
-- Total tests: 29 passing (2 health + 15 models + 12 parser)
-- Execution time: ~1.5 seconds
+**Completed (3 Mar 2026):**
+- ✅ **Unit tests for ai_service.py (10 tests) - COMPLETE**
+  - Success cases: enhancement, metrics detection, action verbs (3 tests)
+  - Validation & cleaning: output validation, cleaning, length checks (3 tests)
+  - Error handling: API errors, missing API key (2 tests)
+  - Quality metrics: measurable results, text length (2 tests)
+  - All tests passing (10/10)
+  - Test file: `backend/tests/test_ai_service.py`
+  - Uses mocked OpenAI API (no real API calls, no costs)
+  - Execution time: ~5 seconds for all AI tests
+
+**Testing Achievements:**
+- Established proper mocking pattern for external APIs (pytest fixtures)
+- Resolved singleton pattern mocking issue (Issue #12)
+- All tests run without internet connectivity or API keys
+- Fast execution (~7 seconds total for 39 tests)
+- Zero API costs during testing
+
+**Current Progress (3 Mar 2026):**
+- Total tests: 39 passing (2 health + 15 models + 12 parser + 10 AI service)
+- Execution time: ~7 seconds for complete test suite
 - No blocking issues
-- Dependencies added: reportlab (for PDF generation in tests)
+- Professional mocking techniques demonstrated
 
-**In Progress (Feb 21-24):**
-- ⏳ Unit tests for ai_service.py (Feb 21-22)
-  - Mock OpenAI API calls
-  - Test bullet point enhancement logic
-  - Test confidence scoring algorithm
-  - Test validation and error handling
-  - Test STAR method prompting
-- ⏳ Unit tests for keyword_matcher.py (Feb 23)
-  - Test keyword extraction
-  - Test match score calculation
+**Next Steps (Mar 4-9, 2026):**
+- ⏳ Unit tests for keyword_matcher.py (Mar 4-5)
+  - Test 100+ STEM keyword database
+  - Test keyword extraction from job descriptions
+  - Test match score calculation algorithm
   - Test ATS compatibility checking
   - Test recommendations generation
-  - Verify 100+ STEM keyword database
-- ⏳ Integration tests for cv_routes.py (Feb 24-25)
+  - Target: 8-10 tests
+- ⏳ Integration tests for cv_routes.py (Mar 6-8)
   - Test CV upload endpoint end-to-end
   - Test enhancement endpoint with mocked AI
   - Test job analysis endpoint
   - Test error handling across all routes
   - Test file upload validation (size, type)
+  - Target: 10-12 tests
 
 **Target:**
 - 70%+ code coverage across all backend services
+- 50+ total tests by Mar 9
 - All core functionality tested
 - Integration tests for complete workflows
-- Aim for 50+ total tests by Feb 25
 
 **Files:**
 - ✅ `backend/tests/test_main.py` (2 tests passing)
 - ✅ `backend/tests/test_cv_models.py` (15 tests passing) - COMPLETE
 - ✅ `backend/tests/test_cv_parser.py` (12 tests passing) - COMPLETE
+- ✅ `backend/tests/test_ai_service.py` (10 tests passing) - COMPLETE
 - ✅ `backend/tests/fixtures/sample_cv.txt` - Real CV test data
-- ⏳ `backend/tests/test_ai_service.py` (planned - Feb 21-22)
-- ⏳ `backend/tests/test_keyword_matcher.py` (planned - Feb 23)
-- ⏳ `backend/tests/test_cv_routes.py` (planned - Feb 24-25)
+- ✅ `backend/tests/test_keyword_matcher.py` (15 tests passing) - COMPLETE
+- ⏳ `backend/tests/test_cv_routes.py` (planned - Mar 6-8)
 
 **Timeline Update:**
-- Feb 20: ✅ Data model tests complete (15 tests)
-- Feb 20: ✅ CV parser tests complete (12 tests)
-- Feb 20: ✅ International location support implemented
-- Feb 21-22: AI service tests (mock OpenAI)
-- Feb 23: Keyword matcher tests
-- Feb 24-25: Integration tests for API routes
-- Feb 26+: Begin frontend development with fully tested backend
+- Feb 20: ✅ Data model tests (15 tests) + CV parser tests (12 tests)
+- Feb 21-23: Travel to London
+- Feb 25 - Mar 1: Illness recovery (tonsillitis)
+- Mar 3: ✅ AI service tests (10 tests) - Resumed work
+- Mar 4-5: Keyword matcher tests
+- Mar 6-8: Integration tests for API routes
+- Mar 10+: Begin frontend development with fully tested backend (50+ tests)
 
 ## Timeline & Milestones
 
-### Week 1 (Feb 17-23, 2026) ✅ COMPLETE
-- ✅ Backend restructuring (17 Feb)
-- ✅ Phase 1: CV data models (18 Feb)
-- ✅ Phase 2: CV parser implementation (18 Feb)
-- ✅ Phase 3: AI service with OpenAI (18-19 Feb)
-- ✅ Phase 4: Keyword matcher & ATS analyzer (18-19 Feb)
-- ✅ Phase 5: API routes implementation (18-19 Feb)
-- ✅ Issue #10: .env encoding fix (18 Feb)
-- ✅ Testing & verification all services (19 Feb)
-- **Status:** 🚀 BACKEND 100% COMPLETE — Ready for Week 2 frontend integration
+### Semester Context
+- **Semester Start:** January 12, 2026
+- **Current Week:** Week 8 (March 3, 2026)
+- **Report Due:** Week 12 (April 1-3, 2026)
+- **Demo/Presentation:** Week 13 (April 6-10, 2026)
+- **Remaining Time:** 4 weeks to complete development, testing, and report
 
-### Week 2 (Feb 24 - Mar 2, 2026)
-- Phase 6: Expand test coverage
-  - Unit tests for all services
-  - Integration tests for API endpoints
-  - Target >70% code coverage
-- Frontend component development
-  - Create Home/Hero component
-  - Create CVUploader component
-  - Create CVBuilder component
-  - Create CVPreview component
-  - Create SuggestionPanel component
-  - Create JobAnalyzer component
-- Frontend-backend integration
-  - Connect components to API
-  - Test upload workflow
-  - Test enhancement workflow
+---
 
-### Week 3 (Mar 3-9, 2026)
-- Phase 6: Complete testing
+### Week 1-2 (Jan 12-25, 2026) - Initial Setup
+- ✅ Created GitHub repository (Jan 15)
+- ✅ Scaffolded React + TypeScript frontend using Vite (Jan 15)
+- ✅ Set up FastAPI backend (Jan 15)
+- ✅ Initial development log created
+
+### Week 3 (Jan 26 - Feb 1, 2026) - Planning & Research
+- Research phase
+- Project Definition Document (PDD) development
+- Requirements gathering
+
+### Week 4 (Feb 2-8, 2026) - CI/CD & Testing Infrastructure
+- ✅ Configured Tailwind CSS and frontend dependencies (Feb 5)
+- ✅ Created CVoraLOGO and integrated into header (Feb 5)
+- ✅ Set up GitHub Actions CI workflow (Feb 8)
+- ✅ Added pytest (backend) and vitest (frontend) tests (Feb 8)
+- ✅ Established branch naming convention and git workflow
+
+### Week 5 (Feb 9-15, 2026) - Backend Planning
+- ✅ Migrated to new private repository: FYP202526-Lin-CVora
+- ✅ Created feature branch structure
+- Backend architecture planning
+
+### Week 6 (Feb 16-22, 2026) - Backend Implementation & Testing (Part 1)
+- ✅ Backend restructuring into modular package layout (Feb 17)
+- ✅ Implemented all 6 core backend files (Feb 18-19):
+  - CV data models (Pydantic)
+  - CV parser (PDF/DOCX with PyPDF2, python-docx)
+  - AI service (OpenAI GPT-3.5-turbo integration)
+  - Keyword matcher (100+ STEM keywords)
+  - API routes (6 REST endpoints)
+  - Main app integration
+- ✅ All backend services operational and documented (Feb 19)
+- ✅ Started Phase 6: Comprehensive testing (Feb 20)
+  - Implemented 15 unit tests for CV data models
+  - Implemented 12 unit tests for CV parser
+  - Enhanced location extraction for international support
+- ⏸️ Feb 21-23: Travel to London (project paused)
+
+### Week 7 (Feb 23 - Mar 1, 2026) - Recovery Period
+- ⏸️ Feb 25 - Mar 1: Illness (tonsillitis) - project paused
+- **No development work this week**
+
+### Week 8 (Mar 2-8, 2026) - CURRENT WEEK - Testing Continuation
+- ✅ Mar 3: Resumed work - implemented 10 AI service unit tests
+- ✅ Total: 39 tests passing (2 health + 15 models + 12 parser + 10 AI service)
+- ✅ Mar 3: Keyword matcher unit tests (15 tests) - completed same day as AI service tests
+- ⏳ Mar 6-7: Integration tests for API routes (10-12 tests)
+- ⏳ Mar 8: Testing wrap-up, aim for 50+ total tests
+- **Goal:** Complete all backend testing by end of week
+
+### Week 9 (Mar 4-15, 2026) - Frontend Development (Started Early)
+- ✅ Mar 4: React Router setup and routing configured
+- ✅ Mar 4: Upload CV page built and integrated with backend
+- ✅ Mar 4: Real CV upload tested end-to-end (parser fixes included)
+- ✅ Mar 4: CI fixed for frontend tests with MemoryRouter
+- ⏳ Job Analysis page
+- ⏳ CV Builder with AI chat panel
+- **Goal:** Functional UI for all major features
+
+### Week 10 (Mar 16-22, 2026) - CRITICAL: Integration & Polish
+- Complete frontend-backend integration
+- Implement all user workflows:
+  - Upload CV → Parse → Display
+  - Build CV → AI Enhancement → Export
+  - Job Analysis → Keyword Matching
 - PDF export functionality
-- Complete end-to-end workflows
-- User testing preparation
-- Sample CV and job description files
+- Error handling and user feedback
+- **Goal:** Fully working application end-to-end
 
-### Week 4 (Mar 10-16, 2026)
-- Comprehensive testing
-- Bug fixes based on test results
-- Performance optimization
-- Security review
+### Week 11 (Mar 23-29, 2026) - CRITICAL: User Testing & Report
+- **Days 1-3 (Mar 23-25):** User evaluation with 5-10 STEM students
+- **Days 4-7 (Mar 26-29):** Report writing (MAJOR FOCUS)
+  - Introduction, Literature Review, Methodology
+  - Implementation details, Testing & Evaluation
+  - Results, Discussion, Conclusion
+- Bug fixes from user feedback
+- **Goal:** Complete draft report by Mar 29
 
-### Week 5-6 (Mar 17-30, 2026)
-- Complete both workflows (upload + build)
-- PDF export functionality
-- Job analysis UI
-- End-to-end testing
-- User evaluation setup
+### Week 12 (Mar 30 - Apr 5, 2026) - SUBMISSION WEEK
+- **Apr 1-3:** Final report revisions and submission
+- **Apr 3-5:** Prepare demo presentation
+- Final code cleanup and documentation
+- **REPORT SUBMISSION DEADLINE**
 
-### Week 7 (Mar 31 - Apr 6, 2026)
-- User testing (5-10 STEM students)
-- Collect evaluation data
-- Bug fixes
-
-### Week 8 (Apr 7-13, 2026)
-- Final documentation
-- Report writing
-- Presentation preparation
-- **SUBMISSION**
+### Week 13 (Apr 6-10, 2026) - DEMO WEEK
+- **Project Demo/Presentation**
+- Final submission of all materials
 
 ---
 
-## Dependencies Checklist
+## Critical Path Summary
 
-**Current (Installed - 19 Feb 2026):**
-- ✅ fastapi
-- ✅ uvicorn
-- ✅ pydantic
-- ✅ pytest
-- ✅ httpx
-- ✅ python-multipart
-- ✅ email-validator
-- ✅ dnspython
-- ✅ PyPDF2
-- ✅ python-docx
-- ✅ openai
-- ✅ python-dotenv
+**Completed (Weeks 1-8):**
+- ✅ Full backend implementation (6 core files)
+- ✅ 54 comprehensive unit tests
+- ✅ All backend services operational
 
-**To Add (Phase 6+):**
-- ⏳ reportlab (for PDF export)
-- ⏳ spacy (for advanced NLP)
-- ⏳ python-jose (for JWT auth, if needed)
-- ⏳ passlib (for password hashing, if needed)
+**Remaining (Weeks 8-13):**
+- ⏳ Complete backend testing (Week 8)
+- Full frontend development (Weeks 9-10)
+- User testing + Report writing (Week 11)
+- Report submission (Week 12)
+- Final: Demo presentation (Week 13)
 
-**Optional (Later phases):**
-- Advanced NLP libraries (textblob, nltk)
-- Performance monitoring (prometheus-client)
-- Caching (redis)
-
----
-
-## Implementation Progress - CV Parser (18 Feb 2026)
-
-**Status:** ✅ Completed
-
-**Completed Components:**
-
-1. **PDF Parsing (`parse_pdf` method)**
-   - Utilizes PyPDF2.PdfReader for robust PDF text extraction
-   - Concatenates text from all pages to preserve full CV content
-   - Handles multi-page documents seamlessly
-
-2. **DOCX Parsing (`parse_docx` method)**
-   - Uses python-docx Document class for .docx file support
-   - Extracts paragraphs while preserving document structure
-   - Seamless integration with PDF functionality
-
-3. **Personal Information Extraction (`_extract_personal_info` method)**
-   - **Email Detection:** Regex pattern `r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'`
-   - **Phone Extraction:** UK/Ireland pattern `r'(\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}'`
-   - **Social Links:** LinkedIn URL and GitHub URL extraction
-   - **Location Detection:** Keywords "Based in", "Location:", "City" pattern matching
-   - **Name Heuristic:** First uppercase sequence at document start
-
-4. **Section Boundary Detection (`_identify_section_boundaries` method)**
-   - Regex multiline search (re.MULTILINE | re.IGNORECASE) for section headers
-   - Detects: Experience, Education, Skills, Projects, Technical Skills, Summary, Objective
-   - Returns section start/end indices for targeted content extraction
-
-5. **Experience Extraction (`_extract_experience_simple` method)**
-   - Date pattern detection for start/end dates
-   - Achievement bullet point extraction
-   - Company and position identification
-
-6. **Education Extraction (`_extract_education_simple` method)**
-   - Degree type detection (BSc, MSc, PhD, BA, MA, diploma variants)
-   - Institution name extraction
-   - Grades and modules identification
-
-7. **Skills Extraction (`_extract_skills_simple` method)**
-   - 30+ STEM keyword database: Python, Java, JavaScript, C++, C#, SQL, React, Angular, Node.js, Docker, Kubernetes, AWS, Azure, GCP, machine learning, TensorFlow, PyTorch, etc.
-   - Case-insensitive keyword matching
-   - Returns categorized technical skills list
-
-**Integration Points:**
-- All methods follow private naming convention (_method_name) for encapsulation
-- Singleton instance pattern for global parser access
-- Ready for API route integration to `/parse-cv` endpoint
-- Compatible with CVData Pydantic model for structured output
-
-**Next Steps:**
-- Register cv_routes with parser endpoints in app/main.py
-- Implement AI summarization service for extracted data
-- Add keyword matching and ATS scoring
-
----
-
-## Notes
-
-- Focus on MVP features only (8-week timeline is tight)
-- Prioritize working code over perfect code
-- Test incrementally (after each phase)
-- Document as you go (don't wait until end)
-- Keep scope limited to UK/Ireland STEM CVs
-- User approval required for all AI suggestions (ethical AI)
+**Time Pressure:** Only 4 weeks remain to complete frontend, testing, and report! Must prioritize ruthlessly.
