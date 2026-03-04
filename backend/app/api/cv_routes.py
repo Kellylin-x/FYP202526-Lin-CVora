@@ -83,7 +83,8 @@ async def upload_cv(file: UploadFile = File(...)):
             success=True,
             message="CV parsed successfully",
             parsed_data=result.get('parsed_data'),
-            warnings=result.get('warnings', [])
+            warnings=result.get('warnings', []),
+            raw_text=result.get('raw_text', '')
         )
         
     except HTTPException:
