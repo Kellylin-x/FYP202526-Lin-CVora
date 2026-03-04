@@ -166,6 +166,7 @@ class CVUploadResponse(BaseModel):
     message: str
     parsed_data: Optional[CVData] = None
     warnings: List[str] = Field(default_factory=list)
+    raw_text: Optional[str] = None
 
 
 class EnhanceRequest(BaseModel):
