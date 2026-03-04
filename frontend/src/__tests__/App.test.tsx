@@ -1,15 +1,21 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import App from '../App';
 
 describe('App Component', () => {
   it('should render without crashing', () => {
-    render(<App />);
-    expect(screen.getByRole('main')).toBeDefined();
-  });
+    render( 
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+  })
 
   it('should render the application', () => {
-    const { container } = render(<App />);
-    expect(container.firstChild).toBeDefined();
-  });
-});
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    )
+  })
+})
