@@ -1,20 +1,22 @@
+import { Routes, Route } from 'react-router-dom';
 import { Upload, FilePlus2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { FeatureCard } from './components/FeatureCard';
 import { Footer } from './components/Footer';
+import { UploadCV } from './pages/UploadCV';
 
-function App() {
+function LandingPage() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-purple-100 selection:text-purple-700">
       <Header />
-
       <main>
         <Hero />
-
         <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
           <div className="grid md:grid-cols-2 gap-8 lg:gap-12 max-w-5xl mx-auto">
-
             <FeatureCard
               title="Enhance Existing CV"
               description="Upload your current CV and let our AI enhance it with powerful suggestions and improvements."
@@ -27,9 +29,8 @@ function App() {
                 "ATS Compatibility Check",
                 "Job Tailoring"
               ]}
-              onClick={() => console.log('Upload clicked')}
+              onClick={() => navigate('/upload')}
             />
-
             <FeatureCard
               title="Build New CV"
               description="Create a professional CV from scratch with our step-by-step wizard and AI guidance."
@@ -42,15 +43,22 @@ function App() {
                 "Live Preview",
                 "STAR Method Guidance"
               ]}
-              onClick={() => console.log('Build clicked')}
+              onClick={() => console.log('Build clicked - coming soon')}
             />
-
           </div>
         </section>
       </main>
-
       <Footer />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/upload" element={<UploadCV />} />
+    </Routes>
   );
 }
 
