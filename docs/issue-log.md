@@ -292,3 +292,124 @@ def service_with_mock_client(self):
 ## Summary (3 Mar 2026 - Updated)
 - **Test Results:** 68/68 passing (2 health + 15 models + 12 parser + 10 AI + 15 keyword matcher)
 - **Issues Resolved:** #12 singleton mocking, #13 string matching, #14 API shape mismatch, 15 upload 500 error (mock cv_parser), #16 status code mismatch
+
+
+### Issue #17: Frontend Commits Landing on Wrong Git Branch
+- **Date:** 4 Mar 2026
+- **Description:** Multiple frontend commits accidentally pushed to `feat/backend-implementation` instead of `feat/frontend-development` due to not checking active branch before committing
+- **Root Cause:** Switching branches while having uncommitted changes caused checkout errors, leading to commits being made on the wrong branch
+- **Fix Applied:** Used `git merge feat/backend-implementation` into `feat/frontend-development` to bring all changes across. Resolved merge conflicts in `App.tsx` and `UploadCV.tsx` by accepting incoming changes
+- **Status:** ✅ Resolved
+- **Lesson Learned:** Always run `git branch` before committing to confirm active branch. Commit or stash changes before switching branches
+
+---
+
+### Issue #18: Match Score Inaccurate Due to Limited CV Text
+- **Date:** 4 Mar 2026
+- **Description:** Job match score showed 13% when uploading CV with job description — only 1 keyword matched despite CV containing relevant content
+- **Root Cause:** `UploadCV.tsx` was only sending extracted skill tags to the job analyzer instead of full CV raw text. `CVUploadResponse` model did not include `raw_text` field
+- **Fix Applied:** Added `raw_text` field to `CVUploadResponse` Pydantic model. Updated upload endpoint to return `raw_text` from parser result. Updated frontend to use `data.raw_text` for job analysis call
+- **Status:** ✅ Resolved
+- **Result:** Match score improved from 13% to 25%, 2 keywords matched vs 1 previously
+
+---
+
+## Summary (4 Mar 2026 - Updated)
+- **Test Results:** 68/68 passing
+- **Issues Resolved:** #12–#18
+- **Frontend:** Upload CV, Job Analysis, CV Builder all implemented and tested
+- **Backend:** raw_text added to upload response for accurate matching
+
+---
+
+## 6-9 Mar 2026
+
+### Issue #19: GEMINI_API_KEY Not Loading from .env File
+
+- **Date:** 6 Mar 2026
+- **Description:** Backend server displayed "WARNING: GEMINI_API_KEY not set" despite API key being present in `backend/.env` file
+- **Root Cause:** VS Code terminals don't automatically load `.env` files without explicit configuration. The `python-dotenv` package loads `.env` at runtime, but environment variables weren't available in terminal sessions
+- **Impact:** Manual environment variable setting required in each terminal session via `$env:GEMINI_API_KEY = "..."`
+- **Fix Applied:** 
+  1. Created `.vscode/settings.json` with `"python.terminal.useEnvFile": true`
+  2. This configuration ensures all new terminal sessions automatically load `backend/.env`
+  3. Verified API key now accessible in Python via `os.getenv('GEMINI_API_KEY')`
+- **Status:** ✅ Resolved
+- **Verification:** Direct Python call to `ai_service.analyze_job_description()` succeeded with valid JSON response in 2.27s
+- **Notes:** This is a common pitfall in VS Code Python development. The setting enables automatic `.env` loading for all terminal sessions in the workspace
+
+---
+
+### Issue #20: Frontend Blocked by CORS Policy
+
+- **Date:** 7 Mar 2026
+- **Description:** Frontend job analysis requests blocked with error: "Access to fetch at 'http://localhost:8000/api/cv/job/analyze-llm' from origin 'http://localhost:5175' has been blocked by CORS policy"
+- **Root Cause:** Backend CORS middleware configured with strict port whitelist `["http://localhost:5173", "http://localhost:5174"]` but frontend Vite dev server running on port 5175 (ports 5173/5174 were already occupied)
+- **Impact:** All frontend API calls to backend returning CORS errors, job analysis feature non-functional
+- **Investigation:** Ran preflight OPTIONS request manually - confirmed CORS rejection at OPTIONS stage
+- **Fix Applied:**
+  1. Updated `backend/app/main.py` CORS configuration:
+     - Changed `allow_origins=["http://localhost:5173", "http://localhost:5174"]` to `allow_origins=["*"]`
+     - Set `allow_credentials=False` for security (no cookies in dev environment)
+  2. Allows all origins during local development phase
+- **Status:** ✅ Resolved
+- **Verification:** Preflight OPTIONS request returned `200 OK` with `access-control-allow-origin: *` header. Frontend API calls successful
+- **Notes:** Wildcard CORS acceptable for local development. Production deployment should use explicit origin whitelist for security
+
+---
+
+### Issue #21: Gemini API Returning 404 NOT_FOUND Error
+
+- **Date:** 7 Mar 2026
+- **Description:** Job analysis endpoint returning 500 error. Server logs showed: "404 NOT_FOUND: models/gemini-2.0-flash-exp is not found for API version v1alpha"
+- **Root Cause:** Gemini API model name must include `models/` prefix. Initial implementation used `model="gemini-2.5-flash"` which is invalid for Google AI API
+- **Impact:** All job analysis requests failing with 404 from Gemini service
+- **Investigation:** Tested direct API call with `google-genai` SDK - confirmed model name format requirement
+- **Fix Applied:**
+  1. Updated `backend/app/services/ai_service.py`:
+     - Changed `model="gemini-2.5-flash"` to `model="models/gemini-2.5-flash"`
+  2. Verified with direct test: `client.models.generate_content(model='models/gemini-2.5-flash', contents='Hi')`
+- **Status:** ✅ Resolved
+- **Verification:** Test call succeeded with response: "Success: Hi there! How can I help you today?"
+- **Notes:** Google AI API requires full model path format `models/{model-name}`. This differs from some other AI APIs that accept short model names
+
+---
+
+### Issue #22: JSON Parse Errors Despite Code Fixes (Stale Backend Process)
+
+- **Date:** 8-9 Mar 2026
+- **Description:** Frontend continued showing "Failed to parse AI response as JSON: Unterminated string starting at: line 4 column 11" despite implementing robust JSON parsing with fallback mechanisms in `ai_service.py`
+- **Root Cause:** Multiple stale `python3.13.exe` processes running old `uvicorn` instances on port 8000. The `--reload` flag failed to detect code changes, so old backend served outdated code without robust parsing logic
+- **Impact:** Users experiencing parse failures even though current code had 4-layer parsing (direct parse → markdown strip → trailing comma cleanup → JSON extraction → fallback)
+- **Investigation:** 
+  1. Searched entire codebase for "Failed to parse AI response as JSON" - no matches (confirmed error not in current code)
+  2. Checked processes on port 8000: found PID 30488 running old instance
+  3. Tested old endpoint directly: reproduced parse error
+  4. Confirmed old process serving stale `ai_service.py`
+- **Fix Applied:**
+  1. Force-killed all processes on port 8000: `Get-NetTCPConnection -LocalPort 8000 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }`
+  2. Restarted backend cleanly: `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`
+  3. Verified new instance loaded current code with robust parsing
+- **Status:** ✅ Resolved
+- **Verification:** Same API test that previously failed now returned clean JSON:
+  ```json
+  {
+    "job_title": "Software Engineer (Java)",
+    "company": null,
+    "tldr": "This role involves developing secure and scalable software products...",
+    "key_requirements": ["Software Engineering", "Java", "Building secure scalable products", "AI integration", "Microsoft 365 collaboration", "SDLC & CI/CD"],
+    "tech_stack": ["Java", "Spring", "AWS", "AI", "Microsoft 365"],
+    "error": null
+  }
+  ```
+- **Notes:** `uvicorn --reload` doesn't always catch file changes, especially with complex imports. Manual restart sometimes necessary. Consider adding health check endpoint with code version number for debugging
+
+---
+
+## Summary (6-9 Mar 2026)
+- **Issues Resolved:** #19 (GEMINI_API_KEY loading), #20 (CORS blocking), #21 (Gemini model name), #22 (stale backend process)
+- **Features Completed:** LLM-powered job description analysis with Google Gemini 2.5 Flash
+- **Test Results:** 68/68 passing (includes updated AI service tests for new SDK)
+- **Frontend:** Job analysis feature fully operational with structured output display
+- **Backend:** Robust JSON parsing with 4-layer fallback mechanisms implemented
+

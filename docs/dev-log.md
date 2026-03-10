@@ -748,3 +748,91 @@ route's file handling logic without depending on parser success.
 **Verification:**
 - All 68 tests still passing after fixes
 - Real CV upload confirmed working end-to-end via frontend
+
+
+## 4 Mar 2026 - Backend Updates During Frontend Integration
+
+### raw_text Added to CVUploadResponse
+
+**Reason:** During frontend integration testing, the job match score was inaccurate
+because only extracted skill tags were being sent to the job analyzer, not the full CV text.
+
+**Changes Made:**
+
+`cv_models.py`:
+- Added `raw_text: Optional[str] = None` field to `CVUploadResponse` model
+
+`cv_routes.py`:
+- Updated upload endpoint return statement to include `raw_text=result.get('raw_text', '')`
+- Parser already produced raw_text internally — just needed to pass it through to response
+
+**Result:**
+- Match score improved from 13% to 25% on test CV against JP Morgan job description
+- Full CV text now used for keyword matching instead of skill tags only
+- All 68 tests still passing after changes
+
+## 5 Mar 2026 - Supervisor Meeting
+
+### Project Direction Update
+- Met with supervisor to discuss FYP progress and next features
+- Reviewed completed backend implementation (CV parsing, keyword matching)
+- **Supervisor suggestion:** Integrate LLM for job analysis and CV enhancement
+- **Decision:** Prioritize job description analysis feature first
+- Research Google Gemini API as cost-effective alternative to OpenAI
+
+---
+
+## 6-9 Mar 2026 - LLM Job Analysis Implementation
+
+### Google Gemini API Integration
+
+Implemented AI-powered job description analysis to extract structured data (requirements, tech stack, salary, work model) for improved ATS matching.
+
+**Technology Stack:**
+- Google Gemini 2.5 Flash API via `google-genai` package
+- Model: `models/gemini-2.5-flash` with JSON response mode
+- Configuration: `temperature=0.0`, `max_output_tokens=1800`
+
+**Implementation in `ai_service.py`:**
+- Added `analyze_job_description()` method with detailed prompt engineering
+- Returns structured dict: job_title, company, employment_type, work_model, salary, tldr, experience_level, key_requirements, tech_stack
+- Implemented robust 4-layer JSON parsing (direct parse → markdown strip → trailing comma cleanup → JSON extraction → fallback)
+- Added helper methods: `_parse_json_response()`, `_strip_markdown_fences()`, `_extract_json_object()`, `_default_job_analysis()`
+- Handles malformed LLM responses (markdown fences, trailing commas, mixed text)
+
+**API Route Added:**
+- POST `/api/cv/job/analyze-llm` endpoint in `cv_routes.py`
+- Accepts `JobDescriptionRequest` (Pydantic model)
+- Returns structured job analysis or error response
+
+**Configuration Fixes:**
+- Created `.vscode/settings.json` with `python.terminal.useEnvFile: true` for automatic `.env` loading
+- Updated CORS middleware to `allow_origins=["*"]` for local development (frontend on port 5175)
+- Fixed Gemini model name from `"gemini-2.5-flash"` to `"models/gemini-2.5-flash"` (API requirement)
+- Resolved stale backend process issue (uvicorn --reload not detecting changes, required manual restart)
+
+**Test Updates:**
+- Updated `tests/test_ai_service.py` mocks from `client.generate_content` to `client.models.generate_content`
+- All 68 tests passing (2 health + 15 models + 12 parser + 10 AI + 15 matcher + 14 routes)
+
+**End-to-End Verification:**
+- Successfully analyzed JP Morgan "Lead Software Engineer - Java & React" job description
+- Frontend correctly displays: job title, TLDR, requirements, tech stack badges, nice-to-haves, soft skills
+- Average API response time: ~2-3 seconds
+- No parse errors or timeout issues
+
+### Current Status (9 Mar 2026)
+
+**Completed:**
+- ✅ Google Gemini API integrated with JSON mode
+- ✅ Robust multi-layer JSON parsing with fallback mechanisms
+- ✅ Job description analysis fully functional end-to-end
+- ✅ Environment configuration automated via VS Code settings
+- ✅ CORS configured for local development
+- ✅ All tests passing (68/68)
+
+**Next Steps (Planned):**
+1. Implement **CV Enhancement** feature with `enhance_cv_bullet_point()` using STAR method
+2. Add **CV Summary Generation** tailored to STEM/tech roles
+3. Implement **CV-to-Job Comparison** to identify skill gaps
+4. Production hardening: API rate limiting, request caching, timeout handling
