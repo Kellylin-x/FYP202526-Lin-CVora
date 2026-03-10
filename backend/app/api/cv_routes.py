@@ -9,7 +9,9 @@ from ..models.cv_models import (
     EnhanceRequest, 
     EnhanceResponse,
     JobAnalysisRequest,
-    JobAnalysisResponse
+    JobAnalysisResponse,
+    JobAnalysisLLMResponse,
+    CVCompareResponse
 )
 from ..services.cv_parser import cv_parser
 from ..services.ai_service import ai_service
@@ -203,6 +205,91 @@ async def analyze_job_description(request: JobAnalysisRequest):
             detail=f"Error analyzing job description: {str(e)}"
         )
 
+@router.post("/job/analyze-llm", response_model=JobAnalysisLLMResponse)
+async def analyze_job_description_llm(request: JobAnalysisRequest):
+    """
+    LLM-powered job description analysis
+    Returns structured summary: TL;DR, employment type, remote/hybrid, salary, requirements
+    """
+    if len(request.job_description) < 50:
+        raise HTTPException(status_code=400, detail="Job description too short. Minimum 50 characters required.")
+
+    try:
+        # Clean and sanitize the job description to handle special characters
+        job_desc = request.job_description.strip()
+
+        # Remove or escape problematic characters that could break JSON parsing
+        # Replace smart quotes with regular quotes
+        job_desc = job_desc.replace('"', '"').replace('"', '"').replace(''', "'").replace(''', "'")
+        # Replace newlines with spaces to avoid JSON issues
+        job_desc = job_desc.replace('\n', ' ').replace('\r', ' ')
+        # Remove excessive whitespace
+        job_desc = ' '.join(job_desc.split())
+
+        # Additional validation - ensure the cleaned text is still valid
+        if not job_desc or len(job_desc) < 10:
+            raise HTTPException(status_code=400, detail="Job description became too short after cleaning. Please provide more content.")
+
+        result = ai_service.analyze_job_description(job_desc)
+
+        if result.get('error'):
+            raise HTTPException(status_code=503, detail=result['error'])
+
+        return JobAnalysisLLMResponse(
+            job_title=result.get('job_title'),
+            company=result.get('company'),
+            tldr=result.get('tldr'),
+            employment_type=result.get('employment_type'),
+            work_model=result.get('work_model'),
+            salary=result.get('salary'),
+            experience_level=result.get('experience_level'),
+            key_requirements=result.get('key_requirements', []),
+            nice_to_have=result.get('nice_to_have', []),
+            tech_stack=result.get('tech_stack', []),
+            soft_skills=result.get('soft_skills', [])
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analysing job description: {str(e)}")
+
+
+@router.post("/compare", response_model=CVCompareResponse)
+async def compare_cv_to_job(request: JobAnalysisRequest):
+    """
+    LLM-powered CV vs job description comparison
+    Returns intelligent match score, strengths, gaps and recommendations
+    """
+    if len(request.job_description) < 50:
+        raise HTTPException(status_code=400, detail="Job description too short. Minimum 50 characters required.")
+
+    if not request.cv_text:
+        raise HTTPException(status_code=400, detail="CV text is required for comparison.")
+
+    try:
+        result = ai_service.compare_cv_to_job(
+            cv_text=request.cv_text,
+            job_description=request.job_description
+        )
+
+        if result.get('error'):
+            raise HTTPException(status_code=503, detail=result['error'])
+
+        return CVCompareResponse(
+            match_score=result.get('match_score'),
+            match_summary=result.get('match_summary'),
+            strengths=result.get('strengths', []),
+            gaps=result.get('gaps', []),
+            recommendations=result.get('recommendations', []),
+            ats_verdict=result.get('ats_verdict')
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error comparing CV to job: {str(e)}")
+
 
 @router.get("/health")
 async def cv_routes_health():
@@ -213,5 +300,7 @@ async def cv_routes_health():
             "POST /api/cv/upload",
             "POST /api/cv/enhance-bullet",
             "POST /api/cv/job/analyze"
+            "POST /api/cv/job/analyze-llm",
+            "POST /api/cv/compare"
         ]
     }
