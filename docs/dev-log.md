@@ -653,3 +653,185 @@ Tests verify the "contract" between code and users - exact key names, data types
 - Tests grouped by functionality (success, validation, errors)
 - Fixtures provide reusable test setup
 - Descriptive test names explain what is verified
+
+### CV Routes Integration Tests Implementation (4 Mar 2026)
+
+**Created:** `backend/tests/test_cv_routes.py` with 14 integration tests
+
+**Approach — Integration Testing with Mocking:**
+Integration tests hit the actual FastAPI endpoints using `TestClient` rather than calling
+services directly. External dependencies (cv_parser, ai_service) are mocked at the route
+level so tests verify route logic and HTTP behaviour independently of service internals.
+
+**Key Decision — Mock cv_parser for Upload Tests:**
+Initial upload tests returned 500 because the cv_parser couldn't build a valid `CVData`
+object from minimal generated PDFs — `PersonalInfo` has required fields (full_name, email,
+phone, location) that wouldn't be extracted from 3 lines of text. Solution: patch
+`app.api.cv_routes.cv_parser` and return a pre-built mock CVData object, testing the
+route's file handling logic without depending on parser success.
+
+**Test Coverage (14 tests across 4 classes):**
+
+1. **TestCVUploadEndpoint (5 tests):**
+   - `test_upload_valid_pdf` — PDF upload returns 200 with parsed_data and warnings
+   - `test_upload_valid_docx` — DOCX upload returns 200 with parsed_data
+   - `test_upload_invalid_file_type` — .txt file rejected with 400 and detail message
+   - `test_upload_no_filename` — empty filename rejected with 400 or 422
+   - `test_upload_returns_warnings_for_incomplete_cv` — warnings list returned for minimal CV
+
+2. **TestEnhanceBulletEndpoint (4 tests):**
+   - `test_enhance_bullet_success` — returns 200 with original, enhanced, confidence, improvements
+   - `test_enhance_bullet_text_too_short` — text under 5 chars rejected with 422 (Pydantic)
+   - `test_enhance_bullet_text_too_long` — text over 500 chars rejected with 400 (route logic)
+   - `test_enhance_bullet_ai_service_error` — AI service error returns 503
+
+3. **TestJobAnalysisEndpoint (4 tests):**
+   - `test_analyze_job_keywords_only` — no CV text returns keywords only, null match fields
+   - `test_analyze_job_with_cv_comparison` — with CV text returns match score and keywords
+   - `test_analyze_job_description_too_short` — under 50 chars rejected with 422
+   - `test_analyze_job_returns_keyword_dict` — extracted_keywords is dict with 'all' key
+
+4. **TestHealthEndpoint (1 test):**
+   - `test_cv_routes_health` — returns 200 with status and routes list
+
+**Test Results:**
+```
+======================== 14 passed in 4.21s ==========================
+```
+
+- ✅ All 14 integration tests passing
+- ✅ Total: 68 tests (2 health + 15 models + 12 parser + 10 AI + 15 keyword matcher + 14 routes)
+- ✅ No changes to production code required
+- ✅ Pushed to GitHub on feat/backend-implementation branch
+
+### Current Testing Status (3 Mar 2026 - COMPLETE)
+
+**All backend testing phases complete:**
+- ✅ Basic health check tests (2 tests - Feb 8)
+- ✅ CV data models unit tests (15 tests - Feb 20)
+- ✅ CV parser unit tests (12 tests - Feb 20)
+- ✅ AI service unit tests (10 tests - Mar 3)
+- ✅ Keyword matcher unit tests (15 tests - Mar 3)
+- ✅ CV routes integration tests (14 tests - Mar 4)
+
+**Total Test Count:** 68 passing
+**Backend testing phase: COMPLETE — ready to begin frontend development**
+
+## 3-4 Mar 2026 (continued) - Parser Fixes
+
+### CV Parser Bug Fixes (identified during frontend integration)
+
+**Issues identified when uploading real CV via frontend:**
+- Experience section not detected despite being present in PDF
+- Institution name showing as "Unknown" for education entries
+- Institution regex capturing too much text (degree name included)
+
+**Fixes Applied:**
+
+`_identify_section_boundaries()`:
+- Old regex `^[\s\-•]*keyword[\s\-:]*$` was too strict
+- PyPDF2 sometimes merges lines or adds whitespace, causing exact match to fail
+- New pattern uses `(?:^|\n)` and `(?:\n|$)` for flexible newline matching
+- Experience section now correctly identified
+
+`_extract_experience_simple()`:
+- Old method split on double newlines (`\n\s*\n`) but PDF text had single newlines with spaces
+- Rewrote to detect date patterns (`2022 – 2024`) as job entry markers
+- Splits remainder on 3+ spaces to separate job title from company
+- Now correctly extracts: "Receptionist & Admin" at "Aura"
+
+`_extract_education_simple()`:
+- Added institution extraction using regex for University/College/Institute/School keywords
+- Refined pattern to `\w+(?:\s+\w+){0,3}` then tightened to single `\w+` to avoid over-capturing
+- Now correctly extracts: "University of Galway"
+
+**Verification:**
+- All 68 tests still passing after fixes
+- Real CV upload confirmed working end-to-end via frontend
+
+## 4 Mar 2026 - Backend Updates During Frontend Integration
+
+### raw_text Added to CVUploadResponse
+
+**Reason:** During frontend integration testing, the job match score was inaccurate
+because only extracted skill tags were being sent to the job analyzer, not the full CV text.
+
+**Changes Made:**
+
+`cv_models.py`:
+- Added `raw_text: Optional[str] = None` field to `CVUploadResponse` model
+
+`cv_routes.py`:
+- Updated upload endpoint return statement to include `raw_text=result.get('raw_text', '')`
+- Parser already produced raw_text internally — just needed to pass it through to response
+
+**Result:**
+- Match score improved from 13% to 25% on test CV against JP Morgan job description
+- Full CV text now used for keyword matching instead of skill tags only
+- All 68 tests still passing after changes
+
+## 5 Mar 2026 - Supervisor Meeting
+
+### Project Direction Update
+- Met with supervisor to discuss FYP progress and next features
+- Reviewed completed backend implementation (CV parsing, keyword matching)
+- **Supervisor suggestion:** Integrate LLM for job analysis and CV enhancement
+- **Decision:** Prioritize job description analysis feature first
+- Research Google Gemini API as cost-effective alternative to OpenAI
+
+---
+
+## 6-9 Mar 2026 - LLM Job Analysis Implementation
+
+### Google Gemini API Integration
+
+Implemented AI-powered job description analysis to extract structured data (requirements, tech stack, salary, work model) for improved ATS matching.
+
+**Technology Stack:**
+- Google Gemini 2.5 Flash API via `google-genai` package
+- Model: `models/gemini-2.5-flash` with JSON response mode
+- Configuration: `temperature=0.0`, `max_output_tokens=1800`
+
+**Implementation in `ai_service.py`:**
+- Added `analyze_job_description()` method with detailed prompt engineering
+- Returns structured dict: job_title, company, employment_type, work_model, salary, tldr, experience_level, key_requirements, tech_stack
+- Implemented robust 4-layer JSON parsing (direct parse → markdown strip → trailing comma cleanup → JSON extraction → fallback)
+- Added helper methods: `_parse_json_response()`, `_strip_markdown_fences()`, `_extract_json_object()`, `_default_job_analysis()`
+- Handles malformed LLM responses (markdown fences, trailing commas, mixed text)
+
+**API Route Added:**
+- POST `/api/cv/job/analyze-llm` endpoint in `cv_routes.py`
+- Accepts `JobDescriptionRequest` (Pydantic model)
+- Returns structured job analysis or error response
+
+**Configuration Fixes:**
+- Created `.vscode/settings.json` with `python.terminal.useEnvFile: true` for automatic `.env` loading
+- Updated CORS middleware to `allow_origins=["*"]` for local development (frontend on port 5175)
+- Fixed Gemini model name from `"gemini-2.5-flash"` to `"models/gemini-2.5-flash"` (API requirement)
+- Resolved stale backend process issue (uvicorn --reload not detecting changes, required manual restart)
+
+**Test Updates:**
+- Updated `tests/test_ai_service.py` mocks from `client.generate_content` to `client.models.generate_content`
+- All 68 tests passing (2 health + 15 models + 12 parser + 10 AI + 15 matcher + 14 routes)
+
+**End-to-End Verification:**
+- Successfully analyzed JP Morgan "Lead Software Engineer - Java & React" job description
+- Frontend correctly displays: job title, TLDR, requirements, tech stack badges, nice-to-haves, soft skills
+- Average API response time: ~2-3 seconds
+- No parse errors or timeout issues
+
+### Current Status (9 Mar 2026)
+
+**Completed:**
+- ✅ Google Gemini API integrated with JSON mode
+- ✅ Robust multi-layer JSON parsing with fallback mechanisms
+- ✅ Job description analysis fully functional end-to-end
+- ✅ Environment configuration automated via VS Code settings
+- ✅ CORS configured for local development
+- ✅ All tests passing (68/68)
+
+**Next Steps (Planned):**
+1. Implement **CV Enhancement** feature with `enhance_cv_bullet_point()` using STAR method
+2. Add **CV Summary Generation** tailored to STEM/tech roles
+3. Implement **CV-to-Job Comparison** to identify skill gaps
+4. Production hardening: API rate limiting, request caching, timeout handling
