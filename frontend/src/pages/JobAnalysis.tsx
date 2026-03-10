@@ -1,47 +1,47 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ArrowLeft, Search, Loader2, CheckCircle2,
-    AlertTriangle, XCircle, ChevronDown, ChevronUp,
-    Target, Lightbulb, Tag, BarChart3
+    ArrowLeft, Search, Loader2, Briefcase, MapPin,
+    Clock, DollarSign, Star, CheckCircle2, Plus,
+    Monitor, Users, ChevronDown, ChevronUp, XCircle
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
 const API_BASE = 'http://localhost:8000';
 
-interface AnalysisResult {
-    extracted_keywords: {
-        all: string[];
-        technical_skills?: string[];
-        methodologies?: string[];
-        soft_skills?: string[];
-    };
-    match_score: number | null;
-    matched_keywords: string[] | null;
-    missing_keywords: string[] | null;
-    recommendations: string[];
-    job_keyword_count: number;
-    cv_keyword_count: number | null;
-    ats_compatible: boolean | null;
-    ats_issues: string[] | null;
+// Shape of the LLM analysis response from the backend
+interface JobAnalysisResult {
+    job_title: string | null;
+    company: string | null;
+    tldr: string | null;               // Plain English summary of the role
+    employment_type: string | null;    // Full-time, Part-time, Contract etc.
+    work_model: string | null;         // Remote, Hybrid, On-site
+    salary: string | null;             // Salary range if mentioned in the job description
+    experience_level: string | null;   // Junior, Mid-level, Senior, Lead
+    key_requirements: string[];        // Must-have skills and experience
+    nice_to_have: string[];            // Preferred but not essential skills
+    tech_stack: string[];              // Technologies mentioned in the job description
+    soft_skills: string[];             // Soft skills mentioned
+    error?: string;
 }
 
+// Page can be in one of these states
 type AnalysisState = 'idle' | 'loading' | 'success' | 'error';
 
 export const JobAnalysis: React.FC = () => {
     const navigate = useNavigate();
-    const [jobDescription, setJobDescription] = useState('');
-    const [cvText, setCvText] = useState('');
-    const [showCvInput, setShowCvInput] = useState(false);
-    const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
-    const [result, setResult] = useState<AnalysisResult | null>(null);
-    const [errorMessage, setErrorMessage] = useState('');
-    const [showAllKeywords, setShowAllKeywords] = useState(false);
 
+    // Form and result state
+    const [jobDescription, setJobDescription] = useState('');
+    const [analysisState, setAnalysisState] = useState<AnalysisState>('idle');
+    const [result, setResult] = useState<JobAnalysisResult | null>(null);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    // Send job description to the LLM analysis endpoint
     const handleAnalyse = async () => {
         if (jobDescription.trim().length < 50) {
-            setErrorMessage('Job description must be at least 50 characters.');
+            setErrorMessage('Please paste the full job description (minimum 50 characters).');
             setAnalysisState('error');
             return;
         }
@@ -50,17 +50,17 @@ export const JobAnalysis: React.FC = () => {
         setErrorMessage('');
 
         try {
-            const body: { job_description: string; cv_text?: string } = {
-                job_description: jobDescription.trim()
-            };
-            if (showCvInput && cvText.trim()) {
-                body.cv_text = cvText.trim();
-            }
+            // Clean the job description before sending to avoid JSON parsing issues
+            const cleanedDescription = jobDescription
+                .trim()
+                .replace(/\n/g, ' ')  // Replace newlines with spaces
+                .replace(/\r/g, ' ')  // Replace carriage returns with spaces
+                .replace(/\s+/g, ' '); // Replace multiple spaces with single space
 
-            const response = await fetch(`${API_BASE}/api/cv/job/analyze`, {
+            const response = await fetch(`${API_BASE}/api/cv/job/analyze-llm`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify({ job_description: cleanedDescription })
             });
 
             if (!response.ok) {
@@ -68,7 +68,7 @@ export const JobAnalysis: React.FC = () => {
                 throw new Error(err.detail || 'Analysis failed');
             }
 
-            const data: AnalysisResult = await response.json();
+            const data: JobAnalysisResult = await response.json();
             setResult(data);
             setAnalysisState('success');
         } catch (err) {
@@ -77,31 +77,28 @@ export const JobAnalysis: React.FC = () => {
         }
     };
 
+    // Reset everything so user can analyse a new job
     const handleReset = () => {
         setJobDescription('');
-        setCvText('');
         setResult(null);
         setAnalysisState('idle');
         setErrorMessage('');
-        setShowAllKeywords(false);
     };
 
-    const getScoreColor = (score: number) => {
-        if (score >= 70) return 'text-green-600';
-        if (score >= 40) return 'text-amber-500';
-        return 'text-red-500';
-    };
-
-    const getScoreBg = (score: number) => {
-        if (score >= 70) return 'from-green-400 to-emerald-500';
-        if (score >= 40) return 'from-amber-400 to-orange-500';
-        return 'from-red-400 to-rose-500';
-    };
-
-    const getScoreLabel = (score: number) => {
-        if (score >= 70) return 'Strong Match';
-        if (score >= 40) return 'Partial Match';
-        return 'Weak Match';
+    // Return the right Tailwind colour classes based on the badge type and value
+    const getBadgeColor = (value: string | null, type: 'employment' | 'work_model' | 'experience') => {
+        if (!value || value === 'unknown') return 'bg-slate-100 text-slate-500';
+        if (type === 'work_model') {
+            if (value.toLowerCase().includes('remote')) return 'bg-green-100 text-green-700';
+            if (value.toLowerCase().includes('hybrid')) return 'bg-blue-100 text-blue-700';
+            return 'bg-orange-100 text-orange-700'; // On-site
+        }
+        if (type === 'experience') {
+            if (value.toLowerCase().includes('junior')) return 'bg-cyan-100 text-cyan-700';
+            if (value.toLowerCase().includes('senior') || value.toLowerCase().includes('lead')) return 'bg-purple-100 text-purple-700';
+            return 'bg-slate-100 text-slate-600'; // Mid-level or unknown
+        }
+        return 'bg-slate-100 text-slate-600';
     };
 
     return (
@@ -109,9 +106,9 @@ export const JobAnalysis: React.FC = () => {
             <Header />
 
             <main className="pt-32 pb-20">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
 
-                    {/* Back Button */}
+                    {/* Back to landing page */}
                     <button
                         onClick={() => navigate('/')}
                         className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium mb-8 transition-colors group"
@@ -120,21 +117,21 @@ export const JobAnalysis: React.FC = () => {
                         Back to Home
                     </button>
 
-                    {/* Page Title */}
+                    {/* Page heading */}
                     <div className="mb-10">
                         <h1 className="text-4xl font-extrabold text-slate-900 mb-3">
                             Job <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-violet-600">Analysis</span>
                         </h1>
                         <p className="text-slate-500 text-lg">
-                            Paste a job description to extract key STEM skills and check how well your CV matches.
+                            Paste a job description and our AI will break it down — what they're really looking for, the tech stack, work model, and more.
                         </p>
                     </div>
 
-                    {/* Input Section */}
+                    {/* Input form — only shown before results */}
                     {analysisState !== 'success' && (
-                        <div className="space-y-5">
+                        <div className="space-y-4">
 
-                            {/* Job Description Input */}
+                            {/* Job description textarea */}
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                                     Job Description <span className="text-red-400">*</span>
@@ -143,41 +140,19 @@ export const JobAnalysis: React.FC = () => {
                                     value={jobDescription}
                                     onChange={(e) => setJobDescription(e.target.value)}
                                     placeholder="Paste the full job description here..."
-                                    rows={10}
+                                    rows={12}
                                     className="w-full border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none transition-all text-sm leading-relaxed"
                                 />
+                                {/* Character count with hint if description is too short */}
                                 <p className="text-xs text-slate-400 mt-1.5 text-right">
-                                    {jobDescription.length} characters {jobDescription.length < 50 && jobDescription.length > 0 && <span className="text-red-400">(min 50)</span>}
+                                    {jobDescription.length} characters
+                                    {jobDescription.length > 0 && jobDescription.length < 200 &&
+                                        <span className="text-amber-500"> — paste the full description for best results</span>
+                                    }
                                 </p>
                             </div>
 
-                            {/* CV Text Toggle */}
-                            <div>
-                                <button
-                                    onClick={() => setShowCvInput(!showCvInput)}
-                                    className="flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium text-sm transition-colors"
-                                >
-                                    {showCvInput ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    {showCvInput ? 'Hide CV text' : '+ Add your CV text to get a match score'}
-                                </button>
-
-                                {showCvInput && (
-                                    <div className="mt-3">
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                            Your CV Text <span className="text-slate-400 font-normal">(optional)</span>
-                                        </label>
-                                        <textarea
-                                            value={cvText}
-                                            onChange={(e) => setCvText(e.target.value)}
-                                            placeholder="Paste your CV text here to see how well it matches the job..."
-                                            rows={8}
-                                            className="w-full border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none transition-all text-sm leading-relaxed"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Error */}
+                            {/* Error message shown if API call fails or input is invalid */}
                             {analysisState === 'error' && (
                                 <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
                                     <XCircle size={20} className="text-red-500 flex-shrink-0" />
@@ -185,7 +160,7 @@ export const JobAnalysis: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Analyse Button */}
+                            {/* Submit button — disabled until 50+ characters entered */}
                             <button
                                 onClick={handleAnalyse}
                                 disabled={analysisState === 'loading' || jobDescription.length < 50}
@@ -208,148 +183,138 @@ export const JobAnalysis: React.FC = () => {
                         </div>
                     )}
 
-                    {/* Results */}
+                    {/* Results section — shown after successful analysis */}
                     {analysisState === 'success' && result && (
-                        <div className="space-y-6">
+                        <div className="space-y-5">
 
-                            {/* Match Score — only if CV text was provided */}
-                            {result.match_score !== null && (
-                                <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-lg text-center">
-                                    <p className="text-slate-500 text-sm font-medium uppercase tracking-wide mb-4">
-                                        CV Match Score
-                                    </p>
-                                    <div className={`text-7xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r ${getScoreBg(result.match_score)} mb-2`}>
-                                        {result.match_score.toFixed(0)}%
+                            {/* Header card with job title, company, and meta badges */}
+                            <div className="bg-gradient-to-br from-purple-500 to-violet-600 rounded-3xl p-6 text-white">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-2xl font-extrabold">
+                                            {result.job_title || 'Role Analysis'}
+                                        </h2>
+                                        {/* Company name if the LLM extracted it */}
+                                        {result.company && (
+                                            <p className="text-purple-200 mt-0.5">{result.company}</p>
+                                        )}
                                     </div>
-                                    <p className={`text-lg font-semibold ${getScoreColor(result.match_score)} mb-4`}>
-                                        {getScoreLabel(result.match_score)}
-                                    </p>
+                                    {/* Quick reset link in top right of header card */}
+                                    <button onClick={handleReset} className="text-purple-200 hover:text-white transition-colors text-sm underline">
+                                        Analyse another
+                                    </button>
+                                </div>
 
-                                    {/* Score Bar */}
-                                    <div className="w-full bg-slate-100 rounded-full h-3 max-w-sm mx-auto">
-                                        <div
-                                            className={`h-3 rounded-full bg-gradient-to-r ${getScoreBg(result.match_score)} transition-all duration-700`}
-                                            style={{ width: `${result.match_score}%` }}
-                                        />
-                                    </div>
+                                {/* Meta badges — only shown if LLM extracted a value */}
+                                <div className="flex flex-wrap gap-2">
+                                    {result.employment_type && result.employment_type !== 'unknown' && (
+                                        <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                            <Clock size={12} /> {result.employment_type}
+                                        </span>
+                                    )}
+                                    {result.work_model && result.work_model !== 'unknown' && (
+                                        <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                            <Monitor size={12} /> {result.work_model}
+                                        </span>
+                                    )}
+                                    {result.experience_level && result.experience_level !== 'unknown' && (
+                                        <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                            <Star size={12} /> {result.experience_level}
+                                        </span>
+                                    )}
+                                    {/* Salary only shown if explicitly mentioned in the job description */}
+                                    {result.salary && (
+                                        <span className="bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                            <DollarSign size={12} /> {result.salary}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
 
-                                    <div className="flex justify-center gap-8 mt-5 text-sm text-slate-500">
-                                        <span><strong className="text-slate-700">{result.matched_keywords?.length ?? 0}</strong> keywords matched</span>
-                                        <span><strong className="text-slate-700">{result.missing_keywords?.length ?? 0}</strong> keywords missing</span>
-                                    </div>
+                            {/* TL;DR — plain English summary of what the employer actually wants */}
+                            {result.tldr && (
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                                    <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+                                        <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full">TL;DR</span>
+                                        What they're really looking for
+                                    </h3>
+                                    <p className="text-slate-600 text-sm leading-relaxed">{result.tldr}</p>
                                 </div>
                             )}
 
-                            {/* Matched Keywords */}
-                            {result.matched_keywords && result.matched_keywords.length > 0 && (
-                                <AnalysisCard
-                                    icon={<CheckCircle2 size={20} className="text-green-600" />}
-                                    title="Matched Keywords"
+                            {/* Must-have requirements extracted by the LLM */}
+                            {result.key_requirements.length > 0 && (
+                                <JobCard
+                                    icon={<CheckCircle2 size={18} className="text-green-600" />}
+                                    title="Must-Have Requirements"
                                     color="green"
                                 >
-                                    <div className="flex flex-wrap gap-2">
-                                        {result.matched_keywords.map((kw, i) => (
-                                            <span key={i} className="bg-green-100 text-green-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                                                {kw}
-                                            </span>
+                                    <ul className="space-y-2">
+                                        {result.key_requirements.map((req, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-slate-600 text-sm">
+                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                                                {req}
+                                            </li>
                                         ))}
-                                    </div>
-                                </AnalysisCard>
+                                    </ul>
+                                </JobCard>
                             )}
 
-                            {/* Missing Keywords */}
-                            {result.missing_keywords && result.missing_keywords.length > 0 && (
-                                <AnalysisCard
-                                    icon={<AlertTriangle size={20} className="text-amber-500" />}
-                                    title="Missing Keywords"
-                                    color="amber"
-                                >
-                                    <p className="text-slate-500 text-sm mb-3">
-                                        Consider adding these to your CV if you have experience with them:
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {result.missing_keywords.map((kw, i) => (
-                                            <span key={i} className="bg-amber-100 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                                                {kw}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </AnalysisCard>
-                            )}
-
-                            {/* Extracted Keywords — job only mode */}
-                            {result.match_score === null && result.extracted_keywords.all.length > 0 && (
-                                <AnalysisCard
-                                    icon={<Tag size={20} className="text-purple-600" />}
-                                    title={`Extracted Keywords (${result.extracted_keywords.all.length} found)`}
+                            {/* Technologies and tools mentioned in the job description */}
+                            {result.tech_stack.length > 0 && (
+                                <JobCard
+                                    icon={<Monitor size={18} className="text-purple-600" />}
+                                    title="Tech Stack"
                                     color="purple"
                                 >
                                     <div className="flex flex-wrap gap-2">
-                                        {(showAllKeywords
-                                            ? result.extracted_keywords.all
-                                            : result.extracted_keywords.all.slice(0, 20)
-                                        ).map((kw, i) => (
-                                            <span key={i} className="bg-purple-100 text-purple-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                                                {kw}
+                                        {result.tech_stack.map((tech, i) => (
+                                            <span key={i} className="bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                                                {tech}
                                             </span>
                                         ))}
                                     </div>
-                                    {result.extracted_keywords.all.length > 20 && (
-                                        <button
-                                            onClick={() => setShowAllKeywords(!showAllKeywords)}
-                                            className="mt-3 text-purple-600 hover:text-purple-700 text-sm font-medium flex items-center gap-1"
-                                        >
-                                            {showAllKeywords ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            {showAllKeywords ? 'Show less' : `Show ${result.extracted_keywords.all.length - 20} more`}
-                                        </button>
-                                    )}
-                                </AnalysisCard>
+                                </JobCard>
                             )}
 
-                            {/* ATS Issues */}
-                            {result.ats_issues && result.ats_issues.length > 0 && (
-                                <AnalysisCard
-                                    icon={<XCircle size={20} className="text-red-500" />}
-                                    title="ATS Compatibility Issues"
-                                    color="red"
+                            {/* Preferred skills — not required but good to have */}
+                            {result.nice_to_have.length > 0 && (
+                                <JobCard
+                                    icon={<Plus size={18} className="text-blue-500" />}
+                                    title="Nice to Have"
+                                    color="blue"
                                 >
                                     <ul className="space-y-2">
-                                        {result.ats_issues.map((issue, i) => (
-                                            <li key={i} className="text-red-700 text-sm flex items-start gap-2">
-                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                                                {issue}
+                                        {result.nice_to_have.map((item, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-slate-600 text-sm">
+                                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
+                                                {item}
                                             </li>
                                         ))}
                                     </ul>
-                                </AnalysisCard>
+                                </JobCard>
                             )}
 
-                            {/* Recommendations */}
-                            {result.recommendations.length > 0 && (
-                                <AnalysisCard
-                                    icon={<Lightbulb size={20} className="text-purple-600" />}
-                                    title="Recommendations"
-                                    color="purple"
+                            {/* Soft skills mentioned in the job description */}
+                            {result.soft_skills.length > 0 && (
+                                <JobCard
+                                    icon={<Users size={18} className="text-cyan-600" />}
+                                    title="Soft Skills"
+                                    color="cyan"
                                 >
-                                    <ul className="space-y-3">
-                                        {result.recommendations.map((rec, i) => (
-                                            <li key={i} className="flex items-start gap-3 text-slate-600 text-sm">
-                                                <span className="mt-0.5 w-5 h-5 rounded-full bg-purple-100 text-purple-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                                                    {i + 1}
-                                                </span>
-                                                {rec}
-                                            </li>
+                                    <div className="flex flex-wrap gap-2">
+                                        {result.soft_skills.map((skill, i) => (
+                                            <span key={i} className="bg-cyan-100 text-cyan-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                                                {skill}
+                                            </span>
                                         ))}
-                                    </ul>
-                                </AnalysisCard>
+                                    </div>
+                                </JobCard>
                             )}
 
-                            {/* Analyse Another */}
-                            <div className="flex justify-center pt-4">
-                                <button
-                                    onClick={handleReset}
-                                    className="text-slate-500 hover:text-slate-700 font-medium underline transition-colors"
-                                >
+                            {/* Bottom reset link */}
+                            <div className="flex justify-center pt-2">
+                                <button onClick={handleReset} className="text-slate-500 hover:text-slate-700 font-medium underline transition-colors text-sm">
                                     Analyse a different job
                                 </button>
                             </div>
@@ -363,23 +328,25 @@ export const JobAnalysis: React.FC = () => {
     );
 };
 
-// Reusable analysis result card
-const AnalysisCard: React.FC<{
+// Reusable card component for each results section
+// Accepts a colour prop to keep the visual style consistent across sections
+const JobCard: React.FC<{
     icon: React.ReactNode;
     title: string;
-    color: 'green' | 'amber' | 'purple' | 'red';
+    color: 'green' | 'purple' | 'blue' | 'cyan';
     children: React.ReactNode;
 }> = ({ icon, title, color, children }) => {
+    // Map colour names to the correct Tailwind border and icon background classes
     const styles = {
         green: { border: 'border-green-100', iconBg: 'bg-green-50' },
-        amber: { border: 'border-amber-100', iconBg: 'bg-amber-50' },
         purple: { border: 'border-purple-100', iconBg: 'bg-purple-50' },
-        red: { border: 'border-red-100', iconBg: 'bg-red-50' },
+        blue: { border: 'border-blue-100', iconBg: 'bg-blue-50' },
+        cyan: { border: 'border-cyan-100', iconBg: 'bg-cyan-50' },
     }[color];
 
     return (
-        <div className={`bg-white border ${styles.border} rounded-2xl p-6 shadow-sm`}>
-            <div className="flex items-center gap-3 mb-4">
+        <div className={`bg-white border ${styles.border} rounded-2xl p-5 shadow-sm`}>
+            <div className="flex items-center gap-3 mb-3">
                 <div className={`w-8 h-8 rounded-lg ${styles.iconBg} flex items-center justify-center`}>
                     {icon}
                 </div>
