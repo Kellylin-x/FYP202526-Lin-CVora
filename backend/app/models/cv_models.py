@@ -196,3 +196,56 @@ class JobAnalysisResponse(BaseModel):
     matched_keywords: Optional[List[str]] = None
     missing_keywords: Optional[List[str]] = None
     recommendations: List[str] = Field(default_factory=list)
+
+
+class JobDescriptionRequest(BaseModel):
+    """Request for LLM job description analysis"""
+    job_description: str = Field(..., min_length=50)
+
+
+class JobDescriptionAnalysisResponse(BaseModel):
+    """Structured response for LLM-powered job analysis"""
+    job_title: Optional[str] = None
+    company: Optional[str] = None
+    tldr: str = ""
+    employment_type: Optional[str] = None
+    work_model: Optional[str] = None
+    salary: Optional[str] = None
+    experience_level: Optional[str] = None
+    key_requirements: List[str] = Field(default_factory=list)
+    nice_to_have: List[str] = Field(default_factory=list)
+    tech_stack: List[str] = Field(default_factory=list)
+    soft_skills: List[str] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
+class JobAnalysisLLMResponse(JobDescriptionAnalysisResponse):
+    """Backward-compatible alias for restored LLM job analysis route."""
+
+
+class CVCompareResponse(BaseModel):
+    """Response for CV vs job comparison."""
+    match_score: int = 0
+    match_summary: str = ""
+    strengths: List[str] = Field(default_factory=list)
+    gaps: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    ats_verdict: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    """A single message in the chat history"""
+    role: str = Field(..., description="'user' or 'assistant'")
+    content: str = Field(..., description="Message text")
+
+
+class CVChatRequest(BaseModel):
+    """Request body for the CV chat endpoint"""
+    message: str = Field(..., min_length=1, description="The user's latest message")
+    history: List[ChatMessage] = Field(default_factory=list, description="Previous conversation turns")
+    cv_data: dict = Field(default_factory=dict, description="The full CVFormData serialised as a dict")
+
+
+class CVChatResponse(BaseModel):
+    """Response from the CV chat endpoint — includes reply and optional suggested edit"""
+    reply: str
+    suggested_edit: Optional[dict] = None

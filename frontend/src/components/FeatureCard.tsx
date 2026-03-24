@@ -1,10 +1,11 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { CheckCircle2 } from 'lucide-react';
 
 interface FeatureCardProps {
     title: string;
     description: string;
-    icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+    icon: LucideIcon;
     features: string[];
     buttonText: string;
     variant: 'teal' | 'purple';
@@ -24,13 +25,13 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
 
     const styles = {
         card: `bg-white rounded-3xl p-8 shadow-xl border border-slate-100 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 h-full flex flex-col`,
-        iconWrapper: `w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${isTeal ? 'bg-cyan-100 text-cyan-600' : 'bg-purple-100 text-purple-600'
+        iconWrapper: `w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${isTeal ? 'bg-cyan-100 text-cyan-600' : 'bg-[#663399]/10 text-[#663399]'
             }`,
         button: `w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg ${isTeal
             ? 'bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600 text-white'
-            : 'bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white'
+            : 'bg-gradient-to-r from-[#663399] to-[#4d2673] hover:from-[#4d2673] hover:to-[#3d1d5c] text-white'
             }`,
-        featureIcon: isTeal ? 'text-cyan-500' : 'text-purple-500',
+        featureIcon: isTeal ? 'text-cyan-500' : 'text-[#663399]',
     };
 
     return (

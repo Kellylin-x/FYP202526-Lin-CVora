@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables
-load_dotenv()
+# Load environment variables using explicit path (avoids BOM/CWD issues)
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", encoding="utf-8-sig")
 
 # Import routers
 from .api.cv_routes import router as cv_router

@@ -836,3 +836,109 @@ Implemented AI-powered job description analysis to extract structured data (requ
 2. Add **CV Summary Generation** tailored to STEM/tech roles
 3. Implement **CV-to-Job Comparison** to identify skill gaps
 4. Production hardening: API rate limiting, request caching, timeout handling
+
+## 11-12 Mar 2026 - Backend Additions for CV Builder & Chat
+
+### New Models Added to cv_models.py
+
+Three new Pydantic models added to support the AI chat endpoint:
+```python
+class ChatMessage(BaseModel):
+    role: str       # "user" or "assistant"
+    content: str
+
+class CVChatRequest(BaseModel):
+    message: str
+    history: List[ChatMessage]
+    cv_data: dict
+
+class CVChatResponse(BaseModel):
+    reply: str
+    suggested_edit: Optional[dict] = None
+```
+
+`suggested_edit` added to `CVChatResponse` after initial implementation — allows the AI to propose direct edits to CV fields alongside its conversational reply.
+
+---
+
+### New Method: chat_with_cv_context() in ai_service.py
+
+Context-aware CV assistant using Gemini. Full CV data injected into prompt so the AI can give specific, personalised advice rather than generic tips.
+
+**Prompt structure:**
+- Personal info, target role, experience (with IDs and bullet indices), education, skills, projects, professional summary all included as readable text
+- Conversation history formatted as a labelled transcript
+- AI instructed to return JSON with `reply` and optional `suggested_edit`
+
+**Gemini-specific implementation:**
+- Uses `self.client.models.generate_content()` with a single prompt string
+- History embedded in prompt as transcript (not as messages array)
+- `response_mime_type: "application/json"` removed after causing 503 errors
+- `_parse_json_response()` used to extract JSON from plain text response
+- `max_output_tokens` set to 1000
+
+**suggested_edit field shapes:**
+
+| field | extra keys |
+|-------|-----------|
+| `professional_summary` | `value` |
+| `experience_bullet` | `exp_id`, `bullet_index`, `value` |
+| `skills_add` | `skill_type`, `values[]` |
+| `project_description` | `project_id`, `value` |
+
+---
+
+### New Route: POST /api/cv/chat in cv_routes.py
+```
+POST /api/cv/chat
+Body: CVChatRequest
+Response: CVChatResponse
+```
+
+- Serialises `ChatMessage` history to plain dicts
+- Calls `ai_service.chat_with_cv_context()`
+- Returns 503 if AI service returns error
+- Returns 400 if message is empty
+
+---
+
+### Git Branch Issue Resolution (11 Mar 2026)
+
+During frontend development, `ai_service.py` on `feat/frontend-development` was found to contain an OpenAI version, overwritten during an earlier merge conflict. The backend branch had the correct Gemini version.
+
+**Resolution:**
+```
+git checkout feat/backend-implementation -- backend/app/services/ai_service.py
+git checkout feat/backend-implementation -- backend/app/api/cv_routes.py
+git checkout feat/backend-implementation -- backend/app/models/cv_models.py
+```
+
+Then re-applied chat additions manually to each file.
+
+**Root cause:** Working across two branches without merging caused files to diverge. Backend Python files now managed on `feat/frontend-development` to keep everything in one working branch.
+
+---
+
+### Test Suite: 73 Passing (12 Mar 2026)
+
+Updated `test_ai_service.py` — all mocks migrated from OpenAI to Gemini:
+- `mock_client.chat.completions.create` → `mock_client.models.generate_content`
+- `response.choices[0].message.content` → `response.text`
+- Added `_mock_gemini_response()` fixture helper
+
+5 new tests for `chat_with_cv_context`:
+- Reply returned on success
+- Conversation history embedded in prompt
+- Missing API key returns error
+- Gemini exception handled gracefully
+- CV data (name, target role) appears in prompt
+
+**Test count: 73 passing** (was 68 before chat tests added)
+
+---
+
+### Integration Stability Fixes (12 Mar 2026)
+
+- `.env` BOM handling fix in `backend/app/main.py`: switched dotenv loading to explicit path with `encoding="utf-8-sig"` so `GEMINI_API_KEY` loads correctly even if VS Code writes BOM.
+- Backend run-port standardisation during debugging: moved testing to port `8010` to avoid stale processes still bound to `8000`.
+- Frontend integration alignment: updated frontend API base URLs to point to backend port `8010` during this debugging cycle.

@@ -325,3 +325,240 @@ Soft Skills:
 - CV Builder end-to-end testing with AI enhancement
 - PDF export functionality for built CV
 - User evaluation preparation (Week 11)
+
+## 9-12 Mar 2026 - CV Builder Wizard (Phase 1 & 2)
+
+### CV Builder Page — Complete Rebuild
+
+Rebuilt `frontend/src/pages/CVBuilder.tsx` from scratch as a multi-step wizard.
+Previous version was a single long form — replaced with a guided step-by-step
+flow following supervisor feedback and comparison with Copilot's recommended approach.
+
+**Architecture Decision — Wizard Pattern:**
+- Central `CVFormData` state held in parent `CVBuilder` component
+- Passed down as props to each step — all steps read from and write to same object
+- This means the live preview, chat panel, and all steps share a single source of truth
+- Adding new steps only requires a new entry in `STEPS` array and a `renderStep()` case
+
+---
+
+### Phase 1: Wizard Foundation (9-10 Mar 2026)
+
+**Created wizard shell with:**
+- `Stepper` component — horizontal progress indicator with filled connector lines
+- Completed steps show purple gradient tick circle
+- Active step shows purple-bordered white circle
+- `StepPanel` — consistent white card wrapper for each step
+- `NavBar` — Back / step counter / Next buttons
+- `canProceed()` — per-step validation controlling Next button
+
+**Steps added in Phase 1:**
+1. **Personal Info** — full name, email, phone, location (required), LinkedIn, GitHub, website (optional)
+2. **Target Role** — desired job title (required), career focus (optional)
+
+Target Role collected early so it can be passed as context to:
+- AI bullet enhancement (`/api/cv/enhance-bullet`)
+- AI chat panel system prompt
+- Summary step placeholder text
+
+**Routing:**
+- Updated `App.tsx` `onClick` on "Build New CV" card from `console.log` placeholder to `navigate('/build')`
+
+---
+
+### Phase 2: Core CV Steps (10-11 Mar 2026)
+
+**Added four new steps:**
+
+3. **Experience** — collapsible entry cards (ExperienceCard)
+   - Each card shows "Job Title · Company" in collapsed header
+   - New cards start open, collapse once filled
+   - Add/remove bullet point responsibilities
+   - AI enhance button (✦) on each bullet — calls `/api/cv/enhance-bullet`
+   - Suggestion shown inline with "Use this" / "Dismiss"
+   - `stopPropagation` on delete button prevents card toggle conflict
+
+4. **Education** — same collapsible card pattern as Experience
+   - Relevant modules as tag chips (type + Enter to add, X to remove)
+
+5. **Skills & Projects** — combined step
+   - Technical skills tag input (purple chips)
+   - Soft skills tag input (cyan chips)
+   - Projects section: title, description textarea, optional link
+   - Projects added after supervisor feedback — sits between Education and Skills in CV
+
+6. **Summary** — textarea placed last intentionally
+   - User has full context to write a meaningful summary by this point
+   - Placeholder adapts to use target job title from Step 2
+
+**Shared UI primitives added:**
+- `Field` — label + input + optional hint, supports `fullWidth` for 2-col grid
+- `Input` — styled text input spread with all HTML input props
+- `TagInput` — reusable tag chip input used for skills and modules
+- `uid()` — random ID generator for Experience/Education/Project entries
+
+**Test results after Phase 2:** 68 tests still passing (no backend changes)
+
+---
+
+### Phase 3 (skipped) — Job Tailoring
+
+Deprioritised in favour of building the AI chatbot first, as the chatbot is the
+core differentiator of the project. Job tailoring can be added later as a step.
+
+---
+
+## 11-12 Mar 2026 - AI Chat Panel (Phase 5)
+
+### Backend Integration for Frontend Chat
+
+Frontend chat work depended on these backend capabilities:
+- `POST /api/cv/chat` endpoint
+- Request/response models for chat history + contextual CV data
+- `chat_with_cv_context()` returning `reply` and optional `suggested_edit`
+
+Key integration behaviour used by the frontend:
+- Chat history is sent with each request for multi-turn context
+- Full `cv_data` is sent so responses are specific to the current CV
+- `suggested_edit` payloads enable one-click apply in the UI
+
+Stability updates during integration:
+- Removed strict JSON MIME response mode after runtime 503 issues
+- Increased output tokens to reduce truncated assistant responses
+- Restored backend files from `feat/backend-implementation` where needed, then re-applied chat additions
+
+---
+
+### Frontend: ChatPanel Component
+
+**Added to `CVBuilder.tsx`:**
+- `ChatMessage` and `SuggestedEdit` TypeScript interfaces
+- `ChatPanel` component — fixed side panel alongside the wizard
+- Chat history lifted to parent `CVBuilder` state so it persists when panel is closed/reopened
+  (Previously stored in `ChatPanel` local state — lost on unmount)
+- Opening chat closes preview and vice versa during wizard (only one panel at a time)
+- After finishing wizard — both panels open simultaneously
+
+**ChatPanel features:**
+- Purple gradient header with Bot icon
+- Greeting message using user's first name and target role if available
+- Suggested prompt chips (only shown before first user message)
+- Message bubbles — user right (purple gradient), assistant left (slate)
+- Typing indicator (3 bouncing dots) while waiting for response
+- Auto-scroll to latest message via `messagesEndRef`
+- Enter to send, Shift+Enter for new line
+
+**Suggested edit card:**
+- Shown below assistant message when `suggested_edit` is returned
+- Displays field label and suggested text in white box
+- "Apply to CV" — calls `applyEdit()` in parent, updates `formData` directly, clears card
+- "Dismiss" — removes card, original text unchanged
+
+**`applyEdit()` in CVBuilder:**
+- `professional_summary` — direct string replace
+- `experience_bullet` — maps over experience array, matches by `exp_id`, replaces bullet at `bullet_index`
+- `skills_add` — spreads new values into existing array, deduplicates with `Set`
+- `project_description` — maps over projects, matches by `project_id`
+
+---
+
+### Frontend: CVPreview Component (Phase 4)
+
+**Added to `CVBuilder.tsx`:**
+- Renders `formData` as a real formatted CV document in real time
+- Serif font (Georgia) to match CV document aesthetic
+- Sections: Name + contact details header, Professional Summary, Work Experience, Education, Projects, Skills
+- Empty sections hidden — preview stays clean until data is entered
+- Empty state shown before any data entered (Eye icon with placeholder text)
+- Contact detail row with icons: Mail, Phone, MapPin, Linkedin, Github, Globe
+- Bullet points for responsibilities, module tags for education, project links shown inline
+
+**Toggle behaviour:**
+- "Preview CV" button — outlined style, opens preview
+- "AI Assistant" button — purple gradient, opens chat
+- Only one panel open at a time during wizard
+- `toggleChat` and `togglePreview` helpers close the other panel automatically
+- Exception: after finishing wizard, both open simultaneously side by side
+
+---
+
+### Finished View
+
+When user clicks "Finish" on last wizard step:
+- `wizardFinished` state set to `true`
+- Wizard hidden, layout switches to full-width two-column: preview left, chat right
+- Both panels sticky at full viewport height
+- "Back to wizard" button — sets `wizardFinished(false)`, closes preview, leaves chat open
+
+---
+
+### Test Suite Updates (12 Mar 2026)
+
+**Updated `test_ai_service.py`:**
+- Rewrote all mocks from OpenAI pattern to Gemini pattern
+  - `mock_client.chat.completions.create` → `mock_client.models.generate_content`
+  - `response.choices[0].message.content` → `response.text`
+- Added `_mock_gemini_response()` helper to avoid repeated mock setup
+- Added 5 new tests for `chat_with_cv_context`:
+  - `test_chat_returns_reply` — success case
+  - `test_chat_includes_conversation_history` — history embedded in prompt
+  - `test_chat_handles_missing_api_key` — no key configured
+  - `test_chat_handles_api_error` — Gemini raises exception
+  - `test_chat_uses_cv_context_in_prompt` — CV data appears in prompt string
+
+**Test results:** 73 passing (was 68, +5 new chat tests)
+
+---
+
+### Integration & Environment Alignment (12 Mar 2026)
+
+- Updated frontend API base URLs to use backend port `8010` during debugging/integration (`UploadCV`, `JobAnalysis`, `CVBuilder`) to avoid stale processes on `8000`.
+
+---
+
+## 12 Mar 2026 - Tips & Guidance Page
+
+### New Feature: Tips Page
+
+**Created `frontend/src/pages/TipsPage.tsx`**
+
+Static advice page with four tabbed sections and collapsible tip cards.
+
+**Sections:**
+- **CV Writing** — page length, summary, action verbs, tailoring
+- **ATS Advice** — what ATS is, formatting rules, keyword strategy, testing
+- **STAR Method** — Situation, Task, Action, Result explained with examples
+- **Interview Tips** — research, STAR stories, technical rounds, follow-up
+
+**UI:**
+- Tab navigation — each section has its own colour (purple, teal, amber, blue)
+- Collapsible tip cards — title bar with chevron, expands to show description + bullet tips
+- Fixed bug: cards in 2-column grid were appearing to open the wrong card
+  - Fix: changed to single-column layout so each card has its own row
+  - Also added `activeSection` to card keys to force remount on tab switch
+- CTA banner at bottom linking to CV builder and job analysis
+
+**Routing and landing page:**
+- Added `/tips` route to `App.tsx`
+- Added fourth feature card "Tips & Guidance" to landing page grid
+- Card uses `Lightbulb` icon and `variant="purple"`
+- Changed "Analyse Job" card from `variant="teal"` to `variant="purple"`
+
+---
+
+## 12 Mar 2026 - Colour Palette Update
+
+### Brand Colour Change: Rebecca Purple (#663399)
+
+Replaced Tailwind's `purple-500` / `violet-600` gradient with Rebecca Purple (`#663399`) as the primary brand colour across the app.
+
+**Files updated:**
+- `FeatureCard.tsx` — button gradient, icon background, feature icon colour
+- `JobAnalysis.tsx` — header card gradient, badge colours, button
+- `CVBuilder.tsx` — stepper, buttons, chat panel header, preview panel header, suggested edit cards
+- `TipsPage.tsx` — tab active state, heading colour, CTA banner
+- `tailwind.config.js` — updated brand colour tokens during iteration
+
+**Approach:** Primary usage was Tailwind arbitrary values (`bg-[#663399]`, `text-[#663399]`) across components, with `tailwind.config.js` also adjusted during iteration to keep brand colour tokens aligned.
+
+**Kept as-is:** `purple-50`, `purple-100`, `purple-200` — light tint backgrounds unchanged as they're subtle and still visually consistent.

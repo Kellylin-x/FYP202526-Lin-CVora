@@ -413,3 +413,85 @@ def service_with_mock_client(self):
 - **Frontend:** Job analysis feature fully operational with structured output display
 - **Backend:** Robust JSON parsing with 4-layer fallback mechanisms implemented
 
+## 9-12 Mar 2026
+
+### Issue #23: ai_service.py Overwritten with OpenAI Version on Frontend Branch
+
+- **Date:** 11 Mar 2026
+- **Description:** `ai_service.py` on `feat/frontend-development` contained the old OpenAI version instead of the Gemini version, causing the chat endpoint to fail with 503 errors
+- **Root Cause:** Working across two branches without merging caused `ai_service.py` to diverge. The OpenAI version had been committed to `feat/frontend-development` at an earlier point and was never updated to Gemini
+- **Fix Applied:** Checked out the correct Gemini version from the backend branch:
+```
+  git checkout feat/backend-implementation -- backend/app/services/ai_service.py
+  git checkout feat/backend-implementation -- backend/app/api/cv_routes.py
+  git checkout feat/backend-implementation -- backend/app/models/cv_models.py
+```
+  Then re-applied chat additions manually to each file
+- **Status:** ✅ Resolved
+- **Lesson Learned:** Working across two feature branches without merging is risky. Backend Python files now managed on `feat/frontend-development` to keep everything in one working branch
+
+---
+
+### Issue #24: Chat Responses Truncated Mid-Sentence
+
+- **Date:** 11 Mar 2026
+- **Description:** AI assistant responses were being cut off mid-sentence in the chat panel
+- **Root Cause:** `max_output_tokens` was set to 500 in `chat_with_cv_context()` — too low for detailed CV advice responses
+- **Fix Applied:** Increased `max_output_tokens` from 500 to 1000 in the Gemini config for the chat method
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #25: response_mime_type Causing 503 Errors on Chat Endpoint
+
+- **Date:** 11 Mar 2026
+- **Description:** `POST /api/cv/chat` returning 503 Service Unavailable after adding `response_mime_type: "application/json"` to the Gemini config in `chat_with_cv_context()`
+- **Root Cause:** Gemini's `response_mime_type` parameter causes issues when the prompt structure doesn't perfectly guarantee JSON — the model occasionally returns non-JSON text which then fails to parse and surfaces as a 503
+- **Fix Applied:** Removed `response_mime_type: "application/json"` from the chat method config. Used `_parse_json_response()` instead to extract JSON from plain text responses, consistent with how `analyze_job_description()` handles it
+- **Status:** ✅ Resolved
+- **Notes:** `response_mime_type` works reliably for job analysis (highly structured prompt) but not for conversational chat where response format is harder to guarantee
+
+---
+
+### Issue #26: Chat History Lost When Panel Closed and Reopened
+
+- **Date:** 12 Mar 2026
+- **Description:** Opening the AI Assistant panel, having a conversation, closing it, then reopening it cleared all previous messages
+- **Root Cause:** Chat messages were stored in local `useState` inside `ChatPanel`. When the panel was hidden (`chatOpen = false`), the component unmounted and its state was lost
+- **Fix Applied:** Lifted `chatMessages` state up to the parent `CVBuilder` component. `ChatPanel` now receives `messages` and `onMessagesChange` as props instead of managing its own state. State persists regardless of whether the panel is open or closed
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #27: TipCard Opening Wrong Card in 2-Column Grid
+
+- **Date:** 12 Mar 2026
+- **Description:** Clicking to expand a tip card on the Tips page appeared to open the card beside it in the same row rather than the clicked card
+- **Root Cause:** Two issues combined:
+  1. Cards in a 2-column grid share the same row, making it visually ambiguous which one opened
+  2. Card `open` state was not reset when switching between tabs, so previously open cards persisted into the new section
+- **Fix Applied:**
+  1. Changed grid from `grid-cols-1 sm:grid-cols-2` to `grid-cols-1` — single column so each card has its own row
+  2. Added `activeSection` to each card's React key (`key={activeSection}-${i}`) to force remount on tab switch, resetting open state
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #28: Wizard Back Button Re-opened Preview Panel
+
+- **Date:** 12 Mar 2026
+- **Description:** After finishing the wizard (which opens preview and chat side by side), clicking "Back to wizard" left the preview panel open, creating a confusing three-column layout with wizard on the left
+- **Root Cause:** `setWizardFinished(false)` only hid the wizard finished view but did not close the preview panel
+- **Fix Applied:** Updated the Back to wizard button onClick to also close preview:
+```tsx
+  onClick={() => { setWizardFinished(false); setPreviewOpen(false); }}
+```
+- **Status:** ✅ Resolved
+
+---
+
+## Summary (9-12 Mar 2026)
+- **Issues Resolved:** #23 (ai_service branch conflict), #24 (truncated chat), #25 (response_mime_type 503), #26 (chat history lost), #27 (wrong tip card opening), #28 (wizard back button layout)
+- **Test Results:** 73/73 passing (5 new chat tests added)
+- **Features Completed:** CV Builder wizard, AI chat panel, CV preview, Tips page, Rebecca Purple colour update
+

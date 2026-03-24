@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ArrowLeft, Search, Loader2, Briefcase, MapPin,
+    ArrowLeft, Search, Loader2,
     Clock, DollarSign, Star, CheckCircle2, Plus,
-    Monitor, Users, ChevronDown, ChevronUp, XCircle
+    Monitor, Users, XCircle
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:8010';
 
 // Shape of the LLM analysis response from the backend
 interface JobAnalysisResult {
@@ -85,22 +85,6 @@ export const JobAnalysis: React.FC = () => {
         setErrorMessage('');
     };
 
-    // Return the right Tailwind colour classes based on the badge type and value
-    const getBadgeColor = (value: string | null, type: 'employment' | 'work_model' | 'experience') => {
-        if (!value || value === 'unknown') return 'bg-slate-100 text-slate-500';
-        if (type === 'work_model') {
-            if (value.toLowerCase().includes('remote')) return 'bg-green-100 text-green-700';
-            if (value.toLowerCase().includes('hybrid')) return 'bg-blue-100 text-blue-700';
-            return 'bg-orange-100 text-orange-700'; // On-site
-        }
-        if (type === 'experience') {
-            if (value.toLowerCase().includes('junior')) return 'bg-cyan-100 text-cyan-700';
-            if (value.toLowerCase().includes('senior') || value.toLowerCase().includes('lead')) return 'bg-purple-100 text-purple-700';
-            return 'bg-slate-100 text-slate-600'; // Mid-level or unknown
-        }
-        return 'bg-slate-100 text-slate-600';
-    };
-
     return (
         <div className="min-h-screen bg-white font-sans">
             <Header />
@@ -120,7 +104,7 @@ export const JobAnalysis: React.FC = () => {
                     {/* Page heading */}
                     <div className="mb-10">
                         <h1 className="text-4xl font-extrabold text-slate-900 mb-3">
-                            Job <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-violet-600">Analysis</span>
+                            Job <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#663399] to-[#4d2673]">Analysis</span>
                         </h1>
                         <p className="text-slate-500 text-lg">
                             Paste a job description and our AI will break it down — what they're really looking for, the tech stack, work model, and more.
@@ -141,7 +125,7 @@ export const JobAnalysis: React.FC = () => {
                                     onChange={(e) => setJobDescription(e.target.value)}
                                     placeholder="Paste the full job description here..."
                                     rows={12}
-                                    className="w-full border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 resize-none transition-all text-sm leading-relaxed"
+                                    className="w-full border border-slate-200 rounded-2xl px-5 py-4 text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-[#7a3db5] resize-none transition-all text-sm leading-relaxed"
                                 />
                                 {/* Character count with hint if description is too short */}
                                 <p className="text-xs text-slate-400 mt-1.5 text-right">
@@ -165,7 +149,7 @@ export const JobAnalysis: React.FC = () => {
                                 onClick={handleAnalyse}
                                 disabled={analysisState === 'loading' || jobDescription.length < 50}
                                 className="w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg
-                                    bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700
+                                    bg-gradient-to-r from-[#663399] to-[#4d2673] hover:from-[#4d2673] hover:to-[#3d1d5c]
                                     text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                             >
                                 {analysisState === 'loading' ? (
@@ -188,7 +172,7 @@ export const JobAnalysis: React.FC = () => {
                         <div className="space-y-5">
 
                             {/* Header card with job title, company, and meta badges */}
-                            <div className="bg-gradient-to-br from-purple-500 to-violet-600 rounded-3xl p-6 text-white">
+                            <div className="bg-gradient-to-br from-[#663399] to-[#4d2673] rounded-3xl p-6 text-white">
                                 <div className="flex items-start justify-between mb-4">
                                     <div>
                                         <h2 className="text-2xl font-extrabold">
@@ -263,7 +247,7 @@ export const JobAnalysis: React.FC = () => {
                             {/* Technologies and tools mentioned in the job description */}
                             {result.tech_stack.length > 0 && (
                                 <JobCard
-                                    icon={<Monitor size={18} className="text-purple-600" />}
+                                    icon={<Monitor size={18} className="text-[#4d2673]" />}
                                     title="Tech Stack"
                                     color="purple"
                                 >

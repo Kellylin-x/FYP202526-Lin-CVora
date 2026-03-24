@@ -8,7 +8,7 @@ import {
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://localhost:8010';
 
 interface PersonalInfo {
     full_name?: string;
@@ -418,7 +418,7 @@ export const UploadCV: React.FC = () => {
 
                             {/* Skills */}
                             {uploadResult.parsed_data.skills && (
-                                <ResultCard icon={<Code2 size={20} className="text-purple-600" />} title="Detected Skills" color="purple">
+                                <ResultCard icon={<Code2 size={20} className="text-[#4d2673]" />} title="Detected Skills" color="purple">
                                     {uploadResult.parsed_data.skills.technical.length > 0 && (
                                         <div className="mb-4">
                                             <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Technical</p>
@@ -458,7 +458,7 @@ export const UploadCV: React.FC = () => {
 
                             {/* Education */}
                             {uploadResult.parsed_data.education && uploadResult.parsed_data.education.length > 0 && (
-                                <ResultCard icon={<GraduationCap size={20} className="text-purple-600" />} title="Education Detected" color="purple">
+                                <ResultCard icon={<GraduationCap size={20} className="text-[#4d2673]" />} title="Education Detected" color="purple">
                                     <div className="space-y-3">
                                         {uploadResult.parsed_data.education.map((edu, i) => (
                                             <div key={i} className="border-l-2 border-purple-200 pl-4">

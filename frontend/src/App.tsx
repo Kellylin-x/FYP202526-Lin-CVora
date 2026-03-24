@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { Upload, FilePlus2, Search } from 'lucide-react';
+import { Upload, FilePlus2, Search, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
@@ -7,6 +7,8 @@ import { FeatureCard } from './components/FeatureCard';
 import { Footer } from './components/Footer';
 import { UploadCV } from './pages/UploadCV';
 import { JobAnalysis } from './pages/JobAnalysis';
+import { CVBuilder } from './pages/CVBuilder';
+import { TipsPage } from './pages/TipsPage';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -44,13 +46,13 @@ function LandingPage() {
                 "Live Preview",
                 "STAR Method Guidance"
               ]}
-              onClick={() => console.log('Build clicked - coming soon')}
+              onClick={() => navigate('/build')}
             />
             <FeatureCard
               title="Analyse Job"
               description="Paste a job description to extract key skills and check how well your CV matches the role."
               icon={Search}
-              variant="teal"
+              variant="purple"
               buttonText="Analyse Job"
               features={[
                 "Keyword Extraction",
@@ -59,6 +61,20 @@ function LandingPage() {
                 "Tailored Recommendations"
               ]}
               onClick={() => navigate('/job-analysis')}
+            />
+            <FeatureCard
+              title="Tips & Guidance"
+              description="CV writing advice, interview tips, STAR method guide, and how to beat ATS systems."
+              icon={Lightbulb}
+              variant="teal"
+              buttonText="View Tips"
+              features={[
+                "CV Writing Tips",
+                "ATS Advice",
+                "STAR Method Guide",
+                "Interview Preparation"
+              ]}
+              onClick={() => navigate('/tips')}
             />
           </div>
         </section>
@@ -74,7 +90,8 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/upload" element={<UploadCV />} />
        <Route path="/job-analysis" element={<JobAnalysis />} />
-       <Route path="/build" element={<div className="pt-32 text-center text-slate-500">CV Builder coming soon</div>} />
+       <Route path="/build" element={<CVBuilder />} />
+        <Route path="/tips" element={<TipsPage />} />
     </Routes>
   );
 }

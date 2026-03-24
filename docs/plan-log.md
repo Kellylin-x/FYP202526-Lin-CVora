@@ -434,6 +434,121 @@ Full API endpoint implementation with proper error handling:
 
 ---
 
+## Wizard CV Builder Feature (11 Mar 2026)
+
+**Objective:** Rework the CV Builder into a step-by-step wizard that guides the user through targeted questions, supports optional job-description tailoring, and later incorporates a chatbot assistant with live CV preview.
+
+**Background:**
+- Current CV Builder exists as a large single-page form with live preview and AI chat concepts already explored
+- User wants the new experience built incrementally rather than all at once
+- The flow should feel like a guided wizard instead of presenting the entire CV form immediately
+- Optional job description tailoring must remain skippable so users can build a general CV or tailor it to a role
+
+**Implementation Strategy:**
+- Build in thin vertical slices so each stage is usable before moving to the next
+- Prioritise wizard navigation and shared state first
+- Add chatbot and preview only after core form flow is stable
+- Keep styling consistent with existing frontend pages (Upload CV / Job Analysis)
+
+**Implementation Plan:**
+
+1. **Wizard Foundation** (`frontend/src/pages/CVBuilder.tsx` or split wizard components)
+  - Replace single long form with multi-step wizard shell
+  - Add step indicator / progress UI
+  - Implement next, back, save-in-state navigation
+  - Persist form data across steps using shared React state
+  - Keep first slice limited to navigation + placeholder step content
+
+2. **Step Mapping and Question Design**
+  - Define concise guided steps rather than raw CV sections only
+  - Proposed initial steps:
+    - Personal Details
+    - Target Role
+    - Professional Summary
+    - Experience
+    - Education
+    - Skills
+    - Optional Job Tailoring
+    - Review
+  - Convert each step into question-led prompts to feel conversational
+
+3. **Shared Data Model**
+  - Create/update TypeScript interfaces for wizard form state
+  - Ensure shape supports preview rendering and future chatbot context
+  - Include optional `jobDescription` field and tailoring toggle
+  - Support dynamic arrays for experience, education, and skills
+
+4. **Core Form Steps**
+  - Implement first real steps with validation:
+    - Personal Details
+    - Target Role
+    - Professional Summary
+  - Then add structured repeatable sections:
+    - Experience entries
+    - Education entries
+    - Skills lists
+  - Keep each step focused and visually uncluttered
+
+5. **Optional Job Tailoring Step**
+  - Add a clear yes/no choice for tailoring the CV to a specific role
+  - If yes, reveal job description textarea
+  - If no, skip the step cleanly
+  - Store job description in shared state for future preview/chatbot use
+
+6. **Live Preview Panel**
+  - Reintroduce preview as a parallel panel once wizard data model is stable
+  - Update preview in real time as step data changes
+  - Keep preview readable even when sections are incomplete
+  - Use placeholders for missing sections to avoid blank screen feel
+
+7. **Chatbot Assistant Panel**
+  - Add contextual chatbot after wizard and preview are working
+  - Chatbot should use current wizard state as conversation context
+  - If job description exists, include it in prompts for more tailored help
+  - Initial chatbot scope: guidance, suggestions, and wording help
+  - Defer advanced rewrite automation until core chat UX is stable
+
+8. **Validation and Review**
+  - Add per-step validation and friendly inline guidance
+  - Add final review step before export/save actions
+  - Highlight incomplete required sections
+  - Ensure users can jump back to edit earlier steps without losing data
+
+**Initial Slice to Build First:**
+- Wizard shell
+- Step navigation
+- Shared state model
+- First 1-2 guided steps only
+
+**Reason for Starting Here:**
+- Lowest-risk foundation
+- Makes the final architecture clearer before chatbot/preview complexity is introduced
+- Gives a usable structure quickly and supports step-by-step supervisor demos
+
+**Files to Create/Modify:**
+- `frontend/src/pages/CVBuilder.tsx` (refactor into wizard flow)
+- `frontend/src/App.tsx` (if route/render wiring changes)
+- `frontend/src/components/` (possible new wizard step / preview / chat components)
+- `frontend/src/__tests__/` (add/update tests once UI structure stabilises)
+
+**Success Criteria:**
+- Step-by-step wizard replaces long one-page builder
+- Users can move forward/backward without losing entered data
+- Optional job description step is skippable and stored correctly
+- Live preview updates from shared wizard state
+- Chatbot can reference current CV data and optional job description
+- UI remains clean, guided, and consistent with existing app styling
+
+**Target Completion:** Phased delivery starting 11 Mar 2026
+
+**Status:** ⏳ PLANNED
+
+**Notes:**
+- Implementation will be done incrementally, not all at once
+- First coding milestone is the wizard shell, not the chatbot
+
+---
+
 ## Timeline & Milestones
 
 ### Semester Context
@@ -556,3 +671,104 @@ Full API endpoint implementation with proper error handling:
 - Final: Demo presentation (Week 13)
 
 **Time Pressure:** Only 4 weeks remain to complete frontend, testing, and report! Must prioritize ruthlessly.
+
+## CV Builder Wizard — Execution Summary (9-12 Mar 2026)
+
+**Status:** ✅ COMPLETED
+
+### What Was Built
+
+**Phase 1 — Wizard Foundation (9-10 Mar 2026):**
+- ✅ Multi-step wizard shell with `Stepper`, `StepPanel`, `NavBar` components
+- ✅ Shared `CVFormData` state held centrally in `CVBuilder`, passed to all steps as props
+- ✅ `canProceed()` per-step validation controlling Next button
+- ✅ Personal Info step (name, email, phone, location required; LinkedIn, GitHub, website optional)
+- ✅ Target Role step (job title required, career focus optional)
+- ✅ Steps 2–4 as placeholders ready for Phase 2
+- ✅ `App.tsx` "Build New CV" button wired to navigate('/build')
+
+**Phase 2 — Core CV Steps (10-11 Mar 2026):**
+- ✅ Experience step — collapsible entry cards, add/remove bullets, AI enhance per bullet
+- ✅ Education step — collapsible cards, relevant modules as tag chips
+- ✅ Skills & Projects step — technical/soft tag inputs, projects section (title, description, link)
+- ✅ Summary step — textarea placed last, placeholder adapts to target role
+- ✅ Shared UI primitives: `Field`, `Input`, `TagInput`, `uid()`
+
+**Phase 4 — Live CV Preview (11-12 Mar 2026):**
+- ✅ `CVPreview` component rendering `formData` as real CV document in real time
+- ✅ Georgia serif font, section headers in small caps, bullet points
+- ✅ Contact detail row with icons, empty sections hidden
+- ✅ Projects section between Education and Skills
+- ✅ "Preview CV" toggle button — outlined style, closes chat when opened
+
+**Phase 5 — AI Chat Panel (11-12 Mar 2026):**
+- ✅ `ChatPanel` component — fixed side panel, purple gradient header
+- ✅ Chat history lifted to parent `CVBuilder` state (persists on panel close/reopen)
+- ✅ Suggested prompt chips shown before first user message
+- ✅ Typing indicator, auto-scroll, Enter to send / Shift+Enter for new line
+- ✅ `suggested_edit` card shown below AI message with "Apply to CV" / "Dismiss"
+- ✅ `applyEdit()` handler updates `formData` for summary, bullets, skills, project description
+- ✅ "AI Assistant" toggle button — purple gradient, closes preview when opened
+
+**Finished View:**
+- ✅ Clicking Finish hides wizard, opens preview + chat side by side at full height
+- ✅ "Back to wizard" closes preview, returns to wizard with chat still open
+
+**Backend additions:**
+- ✅ `ChatMessage`, `CVChatRequest`, `CVChatResponse` models added to `cv_models.py`
+- ✅ `chat_with_cv_context()` Gemini method added to `ai_service.py`
+- ✅ `POST /api/cv/chat` route added to `cv_routes.py`
+- ✅ 5 new tests for chat — total 73 passing
+
+---
+
+## Tips & Guidance Page (12 Mar 2026)
+
+**Status:** ✅ COMPLETED
+
+- ✅ `TipsPage.tsx` created with four tabbed sections: CV Writing, ATS Advice, STAR Method, Interview Tips
+- ✅ Collapsible tip cards — single column layout to avoid row ambiguity
+- ✅ Tab colours: purple (CV Writing), teal (ATS), amber (STAR), blue (Interview)
+- ✅ CTA banner linking to CV builder and job analysis
+- ✅ `/tips` route added to `App.tsx`
+- ✅ "Tips & Guidance" feature card added to landing page
+- ✅ "Analyse Job" card changed from teal to purple variant
+
+---
+
+## Colour Palette Update (12 Mar 2026)
+
+**Status:** ✅ COMPLETED
+
+- ✅ Rebecca Purple `#663399` adopted as primary brand colour
+- ✅ Tailwind arbitrary value syntax used throughout (`bg-[#663399]`, `text-[#663399]`)
+- ✅ Updated: `FeatureCard.tsx`, `JobAnalysis.tsx`, `CVBuilder.tsx`, `TipsPage.tsx`
+- ✅ Light tints (`purple-50`, `purple-100`, `purple-200`) kept unchanged
+
+---
+
+## Updated Timeline (as of 12 Mar 2026)
+
+### Week 9 (Mar 9-15) — ✅ COMPLETED EARLY
+- ✅ CV Builder wizard (Phase 1 & 2)
+- ✅ AI chat panel with suggested edits
+- ✅ Live CV preview panel
+- ✅ Tips & Guidance page
+- ✅ Rebecca Purple colour update
+- ✅ 73 tests passing
+
+### Week 10 (Mar 16-22) — Integration & Polish
+- ⏳ User testing preparation
+- ⏳ End-to-end testing of all features
+- ⏳ Bug fixes and UX polish
+- ⏳ PDF export for built CV (if time permits)
+
+### Week 11 (Mar 23-29) — User Testing & Report
+- User evaluation with STEM students
+- Report writing (major focus)
+
+### Week 12 (Mar 30 - Apr 5) — Submission
+- Final report revisions and submission
+
+### Week 13 (Apr 6-10) — Demo
+- Project demo and presentation
