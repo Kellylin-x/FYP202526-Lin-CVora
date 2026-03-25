@@ -2,6 +2,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from typing import Optional
 import os
 import tempfile
+import asyncio
+import re
 
 from ..models.cv_models import (
     CVData, 
@@ -22,6 +24,8 @@ from ..services.keyword_matcher import ats_analyzer
 
 
 router = APIRouter(prefix="/api/cv", tags=["cv"])
+
+LLM_TIMEOUT_SECONDS = 30
 
 
 @router.post("/upload", response_model=CVUploadResponse)
@@ -221,22 +225,59 @@ async def analyze_job_description_llm(request: JobAnalysisRequest):
         # Clean and sanitize the job description to handle special characters
         job_desc = request.job_description.strip()
 
-        # Remove or escape problematic characters that could break JSON parsing
-        # Replace smart quotes with regular quotes
-        job_desc = job_desc.replace('"', '"').replace('"', '"').replace(''', "'").replace(''', "'")
-        # Replace newlines with spaces to avoid JSON issues
+        # Normalize whitespace to reduce prompt noise and token usage.
         job_desc = job_desc.replace('\n', ' ').replace('\r', ' ')
-        # Remove excessive whitespace
         job_desc = ' '.join(job_desc.split())
 
         # Additional validation - ensure the cleaned text is still valid
         if not job_desc or len(job_desc) < 10:
             raise HTTPException(status_code=400, detail="Job description became too short after cleaning. Please provide more content.")
 
-        result = ai_service.analyze_job_description(job_desc)
+        result = await asyncio.wait_for(
+            asyncio.to_thread(ai_service.analyze_job_description, job_desc),
+            timeout=LLM_TIMEOUT_SECONDS
+        )
 
         if result.get('error'):
-            raise HTTPException(status_code=503, detail=result['error'])
+            print(f"Job analysis error: {result.get('error')}")
+            # Fallback to deterministic keyword extraction so UI still receives
+            # structured data when Gemini quota/rate limits are hit.
+            keywords = ats_analyzer.extract_keywords(job_desc)
+
+            # Prefer a role-like phrase from the JD header/body (e.g. "Software Engineer Graduate 2025/2026")
+            # instead of generic technical keywords like "bootstrap".
+            role_hint = "STEM Role"
+            role_patterns = [
+                r'(?im)^\s*([A-Za-z][A-Za-z0-9/&()\-\s]{2,80}\b(?:Engineer|Developer|Analyst|Architect|Scientist|Programmer|Manager|Graduate)\b(?:\s*\d{4}(?:/\d{4})?)?)\s*(?:-|$)',
+                r'(?i)\b([A-Za-z][A-Za-z0-9/&()\-\s]{2,80}\b(?:Engineer|Developer|Analyst|Architect|Scientist|Programmer|Manager|Graduate)\b(?:\s*\d{4}(?:/\d{4})?)?)\b'
+            ]
+            for pattern in role_patterns:
+                match = re.search(pattern, request.job_description)
+                if match:
+                    role_hint = " ".join(match.group(1).split())
+                    break
+
+            if role_hint == "STEM Role":
+                role_match = keywords.get('all', [])
+                if role_match:
+                    role_hint = role_match[0].title()
+
+            return JobAnalysisLLMResponse(
+                job_title=role_hint,
+                company=None,
+                tldr=(
+                    "AI job analysis is temporarily unavailable (for example due to API quota). "
+                    "This is a keyword-based fallback summary."
+                ),
+                employment_type="unknown",
+                work_model="unknown",
+                salary=None,
+                experience_level="unknown",
+                key_requirements=keywords.get('technical_skills', [])[:8],
+                nice_to_have=[],
+                tech_stack=keywords.get('technical_skills', [])[:12],
+                soft_skills=keywords.get('soft_skills', [])[:8]
+            )
 
         return JobAnalysisLLMResponse(
             job_title=result.get('job_title'),
@@ -254,6 +295,11 @@ async def analyze_job_description_llm(request: JobAnalysisRequest):
 
     except HTTPException:
         raise
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Job analysis timed out. Please try again with a shorter job description."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analysing job description: {str(e)}")
 
@@ -271,13 +317,47 @@ async def compare_cv_to_job(request: JobAnalysisRequest):
         raise HTTPException(status_code=400, detail="CV text is required for comparison.")
 
     try:
-        result = ai_service.compare_cv_to_job(
-            cv_text=request.cv_text,
-            job_description=request.job_description
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                ai_service.compare_cv_to_job,
+                request.cv_text,
+                request.job_description
+            ),
+            timeout=LLM_TIMEOUT_SECONDS
         )
 
         if result.get('error'):
-            raise HTTPException(status_code=503, detail=result['error'])
+            print(f"Compare error: {result.get('error')}")
+            # Fallback to deterministic ATS analysis so users still get results
+            # when the LLM is temporarily unavailable or returns malformed output.
+            fallback = ats_analyzer.analyze_job_vs_cv(
+                job_description=request.job_description,
+                cv_text=request.cv_text
+            )
+
+            fallback_score = int(round(float(fallback.get('match_score', 0.0))))
+            fallback_strengths = fallback.get('matched_keywords', [])[:8]
+            fallback_gaps = fallback.get('missing_keywords', [])[:8]
+            fallback_recommendations = fallback.get('recommendations', [])
+
+            if fallback_score >= 70:
+                verdict = "Likely to pass ATS"
+            elif fallback_score >= 40:
+                verdict = "May struggle with ATS"
+            else:
+                verdict = "Unlikely to pass ATS"
+
+            return CVCompareResponse(
+                match_score=fallback_score,
+                match_summary=(
+                    "AI comparison is temporarily unavailable, so this score is based "
+                    "on keyword overlap between your CV and the job description."
+                ),
+                strengths=fallback_strengths,
+                gaps=fallback_gaps,
+                recommendations=fallback_recommendations,
+                ats_verdict=verdict
+            )
 
         return CVCompareResponse(
             match_score=result.get('match_score'),
@@ -290,6 +370,11 @@ async def compare_cv_to_job(request: JobAnalysisRequest):
 
     except HTTPException:
         raise
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="CV comparison timed out. Please retry or reduce the job description length."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error comparing CV to job: {str(e)}")
 
@@ -311,7 +396,7 @@ async def chat_with_cv_assistant(request: CVChatRequest):
         if result.get("error"):
             raise HTTPException(status_code=503, detail=result["error"])
 
-        return CVChatResponse(reply=result["reply"])
+        return CVChatResponse(reply=result["reply"], suggested_edit=result.get("suggested_edit"))
 
     except HTTPException:
         raise

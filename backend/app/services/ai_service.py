@@ -29,6 +29,10 @@ class AIService:
 
         # Max output tokens for bullet point enhancement (short responses only)
         self.max_tokens = 150
+
+        # Input caps keep prompts responsive and avoid large-token stalls.
+        self.max_cv_chars_for_compare = 12000
+        self.max_job_chars_for_compare = 6000
     
     def enhance_bullet_point(self, text: str, context: Dict) -> Dict:
         """
@@ -330,6 +334,9 @@ Text:
         if not self.client:
             return {"error": "AI service not configured (missing API key)"}
 
+        cv_text = (cv_text or "")[:self.max_cv_chars_for_compare]
+        job_description = (job_description or "")[:self.max_job_chars_for_compare]
+
         # Ask Gemini to act as an ATS analyst and return structured JSON
         prompt = f"""You are an expert ATS (Applicant Tracking System) analyst and CV reviewer
 specialising in STEM roles in Ireland and the UK.
@@ -356,17 +363,47 @@ Job Description:
                 model=self.model,
                 contents=prompt,
                 config={
-                    "max_output_tokens": 1000,
-                    "temperature": 0.3,
-                    "response_mime_type": "application/json"
+                    "max_output_tokens": 1500,
+                    "temperature": 0.0
                 }
             )
 
             raw = response.text or ""
             return self._parse_json_response(raw)
 
+        except json.JSONDecodeError:
+            # Second pass: ask the model to repair malformed JSON from its first output.
+            try:
+                repair_prompt = f"""Convert the following text into valid JSON only.
+Do not include markdown, code fences, or explanation text.
+
+Text:
+{response.text if 'response' in locals() and response and response.text else ''}"""
+
+                repair_response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=repair_prompt,
+                    config={
+                        "max_output_tokens": 1000,
+                        "temperature": 0.0,
+                        "response_mime_type": "application/json"
+                    }
+                )
+
+                repaired_raw = repair_response.text or ""
+                return self._parse_json_response(repaired_raw)
+            except Exception as repair_error:
+                return {"error": f"Comparison parse failed: {str(repair_error)}"}
+
         except Exception as e:
             return {"error": f"Comparison failed: {str(e)}"}
+
+    def _truncate_text(self, text: str, max_chars: int) -> str:
+        """Trim oversized text while preserving readable boundaries."""
+        cleaned = " ".join((text or "").split())
+        if len(cleaned) <= max_chars:
+            return cleaned
+        return cleaned[:max_chars].rsplit(" ", 1)[0] + " ..."
 
     def _strip_markdown_fences(self, text: str) -> str:
         """Remove markdown code fences that LLMs may wrap around JSON."""
