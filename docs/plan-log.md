@@ -746,29 +746,59 @@ Full API endpoint implementation with proper error handling:
 - ✅ Light tints (`purple-50`, `purple-100`, `purple-200`) kept unchanged
 
 ---
+- Mar 17-19: Travel to Liverpool (no development work)
 
-## Updated Timeline (as of 12 Mar 2026)
+## Upload CV LLM Upgrade (23-25 Mar 2026)
 
-### Week 9 (Mar 9-15) — ✅ COMPLETED EARLY
-- ✅ CV Builder wizard (Phase 1 & 2)
-- ✅ AI chat panel with suggested edits
-- ✅ Live CV preview panel
-- ✅ Tips & Guidance page
-- ✅ Rebecca Purple colour update
-- ✅ 73 tests passing
+**Status:** ✅ COMPLETED
 
-### Week 10 (Mar 16-22) — Integration & Polish
-- ⏳ User testing preparation
-- ⏳ End-to-end testing of all features
-- ⏳ Bug fixes and UX polish
-- ⏳ PDF export for built CV (if time permits)
+- ✅ Replaced keyword job analysis with `POST /api/cv/job/analyze-llm` on Upload CV page
+- ✅ Added `POST /api/cv/compare` for Gemini-powered CV vs job comparison
+- ✅ Parallel requests with `Promise.allSettled` and 30s timeout
+- ✅ Backend timeout protection with `asyncio.wait_for` on both LLM routes
+- ✅ Keyword fallback on compare and analyze-llm when Gemini unavailable
+- ✅ `response_mime_type` removed from `compare_cv_to_job()` — fixes 503 errors
+- ✅ `max_output_tokens` increased to 1500 on compare — fixes truncated summaries
+- ✅ Input truncation added (12000 chars CV, 6000 chars job desc)
+- ✅ `suggested_edit` now correctly returned from chat route
+- ✅ API base URLs corrected back to port 8000 across all pages
 
-### Week 11 (Mar 23-29) — User Testing & Report
-- User evaluation with STEM students
-- Report writing (major focus)
+## CV Parser Overhaul & Upload CV Completion (26 Mar - 1 Apr 2026)
 
-### Week 12 (Mar 30 - Apr 5) — Submission
-- Final report revisions and submission
+**Status:** ✅ COMPLETED
 
-### Week 13 (Apr 6-10) — Demo
-- Project demo and presentation
+**Objective:** Fix CV parser to correctly handle real-world CVs with varied
+formatting, and complete the Upload CV page end-to-end flow.
+
+- ✅ Section boundary detection rewritten with word-by-word keyword matching
+- ✅ Experience extraction fixed (lines[1:] → lines, FORMAT B support)
+- ✅ Skills expanded to 200+ STEM keywords across 6 categories
+- ✅ Dynamic sections (Achievements, Interests) rendered in CV preview
+- ✅ `enhance_cv_with_chat()` method added to ai_service.py
+- ✅ Gap checklist auto-ticks via `gap_index` from chat response
+- ✅ `normalizeComparison()` frontend helper fixes empty gaps/strengths display
+- ✅ Gemini API key loading fixed via load_dotenv in ai_service.py
+- ✅ Model name confirmed: `gemini-3.1-flash-lite-preview`
+- ✅ Full end-to-end flow verified: AI Mode, gaps, strengths, chat, apply bullet
+
+**Verified with:**
+- Kelly's CV (Ya Li Lin CV.pdf) + Arista Networks job description
+- Oisín's CV (Oisin_Mc_Laughlin_CV_2025.pdf) + same job description
+
+**Known limitations documented:**
+- PDF line wrapping can split bullets mid-sentence
+- CVs with paragraph-style skills sections produce noisier skill lists
+- Custom parsing libraries (pyresparser, skillNer) considered but incompatible
+  with Python 3.13 — noted as future improvement in report
+
+---
+
+## Remaining Tasks (1-5 Apr 2026)
+
+- [ ] User testing with 5 participants
+- [ ] Report: Chapter 3 (Implementation)
+- [ ] Report: Chapter 4 (Testing)
+- [ ] Report: Chapter 5 (Evaluation/User Testing)
+- [ ] Add screenshots and diagrams to report
+- [ ] Remove debug print statements from ai_service.py before submission
+- [ ] Final code cleanup and commit

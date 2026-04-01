@@ -1,8 +1,18 @@
-import google.genai as genai
+from dotenv import load_dotenv
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env", encoding="utf-8-sig")
 import os
+import sys
 from typing import Dict, Optional, Any
 import re
 import json
+
+try:
+    from google import genai
+    _GENAI_IMPORT_ERROR = None
+except Exception as import_error:
+    genai = None
+    _GENAI_IMPORT_ERROR = import_error
 
 
 class AIService:
@@ -19,13 +29,21 @@ class AIService:
             api_key: Gemini API key (if None, reads from GEMINI_API_KEY env var)
         """
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
+        if _GENAI_IMPORT_ERROR is not None:
+            print(
+                "WARNING: google-genai SDK not available in current interpreter. "
+                f"Python: {sys.executable}. "
+                f"Import error: {_GENAI_IMPORT_ERROR}. "
+                "Select backend/.venv interpreter or install google-genai in this environment."
+            )
+            self.client = None
+        elif not self.api_key:
             print("WARNING: GEMINI_API_KEY not set. AI features will not work.")
             self.client = None
         else:
             # Configure the Gemini client with the API key
             self.client = genai.Client(api_key=self.api_key)
-            self.model = "models/gemini-2.5-flash"
+            self.model = "gemini-3.1-flash-lite-preview"  
 
         # Max output tokens for bullet point enhancement (short responses only)
         self.max_tokens = 150
@@ -286,8 +304,7 @@ Job Description:
                 contents=prompt,
                 config={
                     "max_output_tokens": 1800,
-                    "temperature": 0.0,
-                    "response_mime_type": "application/json"
+                    "temperature": 0.0
                 }
             )
 
@@ -308,7 +325,6 @@ Text:
                     config={
                         "max_output_tokens": 1800,
                         "temperature": 0,
-                        "response_mime_type": "application/json"
                     }
                 )
 
@@ -338,19 +354,22 @@ Text:
         job_description = (job_description or "")[:self.max_job_chars_for_compare]
 
         # Ask Gemini to act as an ATS analyst and return structured JSON
-        prompt = f"""You are an expert ATS (Applicant Tracking System) analyst and CV reviewer
-specialising in STEM roles in Ireland and the UK.
-Compare the CV against the job description and return ONLY a valid JSON object.
-Do not include markdown, code fences, or any explanation — just the raw JSON.
+        prompt = f"""You are a strict ATS analyst. You MUST return non-empty arrays.
+Analyse this CV against this job description.
+Return ONLY valid JSON, no markdown, no code fences.
 
 {{
   "match_score": <integer 0-100>,
-  "match_summary": "2-3 sentence honest assessment of how well this CV matches",
-  "strengths": ["list", "of", "things", "cv", "does", "well", "for", "this", "role"],
-  "gaps": ["list", "of", "missing", "skills", "or", "experience"],
-  "recommendations": ["list", "of", "specific", "actionable", "improvements"],
+  "match_summary": "2-3 sentence assessment",
+  "strengths": ["strength 1", "strength 2", "strength 3"],
+  "gaps": ["gap 1", "gap 2", "gap 3"],
+  "recommendations": ["rec 1", "rec 2", "rec 3"],
   "ats_verdict": "Likely to pass ATS / May struggle with ATS / Unlikely to pass ATS"
 }}
+
+CRITICAL: gaps and strengths arrays MUST have at least 3 items each. Never return [].
+gaps should be specific missing skills e.g. "No C++ experience — required as primary language at Arista"
+strengths should reference actual CV content e.g. "Java experience matches job requirement"
 
 CV:
 {cv_text}
@@ -364,7 +383,7 @@ Job Description:
                 contents=prompt,
                 config={
                     "max_output_tokens": 1500,
-                    "temperature": 0.0
+                    "temperature": 0.0,
                 }
             )
 
@@ -385,8 +404,7 @@ Text:
                     contents=repair_prompt,
                     config={
                         "max_output_tokens": 1000,
-                        "temperature": 0.0,
-                        "response_mime_type": "application/json"
+                        "temperature": 0.0
                     }
                 )
 
@@ -396,7 +414,148 @@ Text:
                 return {"error": f"Comparison parse failed: {str(repair_error)}"}
 
         except Exception as e:
-            return {"error": f"Comparison failed: {str(e)}"}
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"ERROR_COMPARE: {error_msg}")
+            return {"error": f"Comparison failed: {error_msg}"}
+
+    def enhance_cv_with_chat(
+        self,
+        message: str,
+        history: list,
+        parsed_cv: dict,
+        gaps: list,
+        job_description: str
+    ) -> dict:
+        """
+        Proactive gap-filling chat for the Upload CV page.
+
+        This is different from chat_with_cv_context (which is for the CV builder wizard).
+        Here we already know the gaps from the compare step, so the AI works through
+        them one by one — asking the user questions and turning their answers into
+        ready-to-apply CV bullets, skills, or summary rewrites.
+
+        Args:
+            message:        The user's latest message
+            history:        Previous conversation turns [{"role": ..., "content": ...}]
+            parsed_cv:      The uploaded CV parsed into a dict (personal_info, experience, etc.)
+            gaps:           List of gap strings from compare_cv_to_job (e.g. "No Docker experience")
+            job_description: The job description text
+
+        Returns:
+            Dict with:
+              "reply"              — conversational message to show the user
+              "suggested_addition" — optional dict with type/value/job_title to apply to CV
+              "gap_index"          — which gap (0-based) this reply is addressing (-1 if none)
+        """
+        if not self.client:
+            return {"error": "AI service not configured (missing API key)"}
+
+        # Build a readable summary of the CV so the AI knows what's already there
+        personal = parsed_cv.get("personal_info") or {}
+        experience = parsed_cv.get("experience") or []
+        skills = parsed_cv.get("skills") or {}
+        summary = parsed_cv.get("professional_summary") or ""
+
+        # Format experience entries so the AI can reference specific job titles
+        exp_text = ""
+        for exp in experience:
+            title = exp.get("job_title", "")
+            company = exp.get("company", "")
+            bullets = exp.get("responsibilities") or []
+            exp_text += f"\n  - {title} at {company}"
+            for b in bullets[:3]:  # Only show first 3 bullets to keep prompt short
+                exp_text += f"\n      • {b}"
+
+        tech_skills = ", ".join(skills.get("technical") or []) or "none listed"
+        soft_skills = ", ".join(skills.get("soft") or []) or "none listed"
+
+        # Format the conversation history so the AI has memory of what was said
+        history_text = ""
+        for msg in history:
+            label = "User" if msg.get("role") == "user" else "Assistant"
+            history_text += f"{label}: {msg.get('content', '')}\n"
+
+        # Number the gaps so the AI can reference them by index
+        numbered_gaps = "\n".join(f"  [{i}] {g}" for i, g in enumerate(gaps)) if gaps else "  (none identified)"
+
+        prompt = f"""You are CVora, an expert CV enhancement assistant for STEM job seekers in Ireland and the UK.
+
+Your job is to work through the identified CV gaps one at a time.
+For each gap, ask the user a targeted question (e.g. "Have you ever used Docker in a project?").
+When they say yes and give details, craft a strong STAR-method CV bullet or suggest a skill to add.
+
+CURRENT CV SUMMARY:
+Name: {personal.get("full_name", "the user")}
+Professional Summary: {summary or "(none)"}
+Technical Skills: {tech_skills}
+Soft Skills: {soft_skills}
+Experience: {exp_text or "(none)"}
+
+JOB DESCRIPTION SNIPPET:
+{(job_description or "")[:1000]}
+
+IDENTIFIED GAPS (numbered so you can track which one you're on):
+{numbered_gaps}
+
+CONVERSATION SO FAR:
+{history_text or "(this is the start of the conversation)"}
+
+User just said: {message}
+
+YOUR RULES:
+- Work through the gaps in order, one at a time
+- Ask short, friendly questions — not an interrogation
+- When the user gives you information, craft a specific STAR-method bullet or skill suggestion
+- Never make up experience the user didn't mention
+- Use UK/Ireland CV tone (professional but not stuffy)
+- If all gaps are covered, congratulate the user and suggest any final polish
+
+Respond with ONLY a valid JSON object, no markdown, no code fences:
+{{
+  "reply": "your conversational reply to the user",
+  "suggested_addition": null,
+  "gap_index": -1
+}}
+
+OR if you have a suggestion ready:
+{{
+  "reply": "explanation of what you crafted and why",
+  "suggested_addition": {{
+    "type": "bullet",
+    "job_title": "the exact job_title from their experience to add this bullet under (or null for summary/skill)",
+    "value": "the full crafted bullet point or skill or summary text"
+  }},
+  "gap_index": 0
+}}
+
+For type use: "bullet" (experience bullet), "skill" (add to technical skills), or "summary" (rewrite professional summary).
+For gap_index: use the number from the gaps list above that this suggestion addresses. Use -1 if not addressing a specific gap.
+
+Return ONLY the JSON object:"""
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config={
+                    "max_output_tokens": 800,
+                    "temperature": 0.7
+                }
+            )
+
+            raw = response.text.strip() if response.text else ""
+
+            # Parse the JSON response — with fallback if the model adds markdown fences
+            result = self._parse_json_response(raw)
+
+            return {
+                "reply": result.get("reply", "Let's work on improving your CV. What gap would you like to tackle first?"),
+                "suggested_addition": result.get("suggested_addition"),
+                "gap_index": result.get("gap_index", -1)
+            }
+
+        except Exception as e:
+            return {"error": f"Chat error: {str(e)}"}
 
     def _truncate_text(self, text: str, max_chars: int) -> str:
         """Trim oversized text while preserving readable boundaries."""
@@ -422,7 +581,6 @@ Text:
         depth = 0
         in_string = False
         escaped = False
-
         for index in range(start, len(text)):
             char = text[index]
 

@@ -495,3 +495,144 @@ def service_with_mock_client(self):
 - **Test Results:** 73/73 passing (5 new chat tests added)
 - **Features Completed:** CV Builder wizard, AI chat panel, CV preview, Tips page, Rebecca Purple colour update
 
+## 23-25 Mar 2026
+
+### Issue #29: compare_cv_to_job() Returning 503 Due to response_mime_type
+
+- **Date:** 24 Mar 2026
+- **Description:** `POST /api/cv/compare` returning 503 Service Unavailable
+- **Root Cause:** `response_mime_type: "application/json"` in `compare_cv_to_job()` config
+  caused Gemini to fail when output didn't perfectly conform to JSON mode
+- **Fix Applied:** Removed `response_mime_type` from config. `_parse_json_response()` handles
+  JSON extraction from plain text — same fix applied to chat and job analysis previously
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #30: Gemini 429 RESOURCE_EXHAUSTED — Free Tier Daily Quota
+
+- **Date:** 24 Mar 2026
+- **Description:** All Gemini-powered endpoints falling back to keyword analysis.
+  Terminal showing `Compare error: 429 RESOURCE_EXHAUSTED`
+- **Root Cause:** `gemini-2.5-flash` free tier daily quota exhausted from repeated testing
+- **Impact:** Compare and job analysis endpoints falling back to keyword-based results
+- **Fix Applied:**
+  1. Waited for quota reset (resets at midnight Pacific / 8am Irish time)
+  2. Confirmed recovery with direct Python test before resuming frontend testing
+  3. Fallback paths ensure app remains functional during quota periods
+- **Status:** ✅ Resolved (quota reset)
+- **Notes:** Fallback behaviour is a feature not just a workaround — app degrades gracefully
+
+---
+
+### Issue #31: CV Comparison Match Summary Truncated Mid-Sentence
+
+- **Date:** 25 Mar 2026
+- **Description:** Match summary in compare results cut off mid-sentence
+- **Root Cause:** `max_output_tokens` set to 1000 in `compare_cv_to_job()` — not enough
+  for full JSON response including all fields
+- **Fix Applied:** Increased `max_output_tokens` to 1500
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #32: suggested_edit Never Returned from Chat Endpoint
+
+- **Date:** 25 Mar 2026
+- **Description:** "Apply to CV" feature in chat panel never appeared — `suggested_edit`
+  always null even when AI suggested an edit
+- **Root Cause:** Chat route was not passing `suggested_edit` in response:
+  `return CVChatResponse(reply=result["reply"])` — missing `suggested_edit`
+- **Fix Applied:** Updated to:
+  `return CVChatResponse(reply=result["reply"], suggested_edit=result.get("suggested_edit"))`
+- **Status:** ✅ Resolved
+
+---
+
+## Summary (25 Mar 2026)
+- **Issues Resolved:** #29 (compare 503), #30 (Gemini quota), #31 (truncated summary), #32 (suggested_edit missing)
+- **Features Completed:** LLM-powered CV comparison on Upload CV page
+- **Test Results:** 73/73 passing (no new tests added — backend changes covered by existing fallback logic)
+
+## 26 Mar - 1 Apr 2026
+
+### Issue #33: _extract_experience Returns Empty List
+
+- **Date:** 26 Mar 2026
+- **Description:** Experience section detected correctly but 0 jobs returned
+- **Root Cause:** `lines[1:]` skipped line 0 which was the first job entry —
+  section boundary detection already strips the heading line, so the job date
+  line was at index 0, not index 1
+- **Fix:** Changed `for i, stripped in enumerate(lines[1:], start=1)` to
+  `for i, stripped in enumerate(lines, start=0)`
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #34: BSc (Honours) Matching Achievements Section Keyword
+
+- **Date:** 27 Mar 2026
+- **Description:** Education section content being assigned to achievements —
+  degree titles containing "Honours" triggered the achievements keyword match
+- **Root Cause:** Section boundary detection used `kw in lower` (substring match),
+  so "honours" inside "BSc (Honours) in Computer Science and IT" matched the
+  achievements keyword list
+- **Fix:** Replaced substring match with word-by-word matching using `kw_words`
+  list comparison with max 2 extra words allowed
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #35: GEMINI_API_KEY Not Loaded When Copilot Starts Uvicorn
+
+- **Date:** 28 Mar 2026
+- **Description:** App running in fallback mode despite key in .env. Debug showed
+  `ai_service.client = None` and `api_key = False`
+- **Root Cause:** Copilot was starting uvicorn from the project root with
+  `--app-dir backend`, so `Path(__file__).resolve().parents[1]` in `main.py`
+  resolved to a different path than the `.env` location. The `ai_service`
+  singleton initialised before `load_dotenv` in `main.py` ran
+- **Fix:** Added `load_dotenv(Path(__file__).resolve().parents[2] / ".env")`
+  at the very top of `ai_service.py` before the class definition
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #36: Multiple Stale Uvicorn Processes on Port 8000
+
+- **Date:** 28-31 Mar 2026
+- **Description:** Webapp consistently hitting fallback mode. Correct uvicorn
+  terminal showed no request logs — requests going to a different process
+- **Root Cause:** Copilot had spawned multiple uvicorn processes across different
+  terminals. The active process was running an old version of `ai_service.py`
+  with wrong model name
+- **Fix:** `Get-Process -Name python* | Stop-Process -Force`, then start single
+  clean uvicorn in one terminal with venv activated
+- **Status:** ✅ Resolved
+- **Lesson:** Never let AI tools manage server processes autonomously
+
+---
+
+### Issue #37: Gemini 404 NOT_FOUND — Wrong Model Name
+
+- **Date:** 31 Mar 2026
+- **Description:** Every compare call returning 404. Terminal showed:
+  `models/gemini-3.1-flash-lite is not found for API version v1beta`
+- **Root Cause:** Stale process was running old `ai_service.py` with model string
+  `gemini-3.1-flash-lite` (missing `-preview` suffix). Newer SDK auto-prepends
+  `models/` so the full string became `models/gemini-3.1-flash-lite`
+- **Fix:** Killed stale process. Confirmed current file has
+  `self.model = "gemini-3.1-flash-lite-preview"`
+- **Status:** ✅ Resolved
+
+---
+
+### Issue #38: thinking_config none Invalid — Causing 400 on Chat
+
+- **Date:** 30 Mar 2026
+- **Description:** Enhancement chat falling back on every request. Backend showed
+  400 INVALID_ARGUMENT from Gemini
+- **Root Cause:** `"thinking_config": {"thinking_level": "none"}` is not a valid
+  value. Valid values are minimal, low, medium, high
+- **Fix:** Removed `thinking_config` entirely from the chat config dict
+- **Status:** ✅ Resolved

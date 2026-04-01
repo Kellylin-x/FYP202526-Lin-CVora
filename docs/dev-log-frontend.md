@@ -562,3 +562,46 @@ Replaced Tailwind's `purple-500` / `violet-600` gradient with Rebecca Purple (`#
 **Approach:** Primary usage was Tailwind arbitrary values (`bg-[#663399]`, `text-[#663399]`) across components, with `tailwind.config.js` also adjusted during iteration to keep brand colour tokens aligned.
 
 **Kept as-is:** `purple-50`, `purple-100`, `purple-200` — light tint backgrounds unchanged as they're subtle and still visually consistent.
+
+## 17-19 Mar 2026 - Travel to Liverpool
+
+- Travelled to Liverpool for a match (17-19 March)
+- No development work during this period
+
+## 23-25 Mar 2026 - Upload CV Page LLM Upgrade
+
+### Upload CV Page — LLM-Powered Job Analysis and CV Comparison
+
+**Updated `frontend/src/pages/UploadCV.tsx`**
+
+Upgraded the job analysis flow from keyword-based matching to full LLM-powered analysis,
+consistent with the Job Analysis page.
+
+**Changes:**
+
+- Replaced `POST /api/cv/job/analyze` (keyword matcher) with `POST /api/cv/job/analyze-llm`
+  for structured job breakdown (TL;DR, must-haves, tech stack, nice-to-have, soft skills)
+- Added `POST /api/cv/compare` call using Gemini to compare the CV against the job description
+  returning: match score (0-100), match summary, strengths, gaps, recommendations, ATS verdict
+- Both LLM calls run in parallel using `Promise.allSettled` — one failing does not block the other
+- Added `fetchWithTimeout` helper (30 seconds) to prevent frontend hanging if backend stalls
+- Added `LLMJobAnalysis` and `CVComparison` TypeScript interfaces
+- Removed old `JobAnalysisResult` interface (keyword-based shape no longer used)
+- Fixed API base URL from port `8010` back to `8000` in `UploadCV.tsx`, `JobAnalysis.tsx`, `CVBuilder.tsx`
+
+**New results layout (when job description provided):**
+1. AI Match Score — gradient header card with %, ATS verdict badge, match summary
+2. Your Strengths — green card, what CV does well for this role
+3. Gaps to Address — amber card, what's missing
+4. Recommendations — numbered list of specific actions
+5. Job breakdown — purple header + TL;DR + Must-haves + Tech Stack + Nice to Have + Soft Skills
+6. Parsed CV sections — Personal Info, Skills, Experience, Education (unchanged)
+
+**Without job description:** Upload and show parsed CV sections only — behaviour unchanged.
+
+**Testing:**
+- Tested with real CV (Kelly's PDF) against Arista Networks Software Engineer Graduate role
+- LLM match score: 65% (Partial Match) — accurate assessment
+- Strengths, gaps, recommendations returned correctly
+- Job breakdown matching Job Analysis page output
+- Fallback to keyword matching confirmed working when Gemini quota exceeded

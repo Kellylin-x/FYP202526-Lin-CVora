@@ -1,10 +1,9 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
-
 # Load environment variables using explicit path (avoids BOM/CWD issues)
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", encoding="utf-8-sig")
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
 from .api.cv_routes import router as cv_router
@@ -21,9 +20,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Vite dev server
+        "http://localhost:5173",  # Vite dev server default
+        "http://localhost:5174",  # Vite dev server (when 5173 is in use)
+        "http://localhost:5175",  # Vite dev server (when 5173/5174 are in use)
         "http://localhost:3000",  # Alternative React port
         "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
         "http://127.0.0.1:3000"
     ],
     allow_credentials=True,

@@ -942,3 +942,184 @@ Updated `test_ai_service.py` — all mocks migrated from OpenAI to Gemini:
 - `.env` BOM handling fix in `backend/app/main.py`: switched dotenv loading to explicit path with `encoding="utf-8-sig"` so `GEMINI_API_KEY` loads correctly even if VS Code writes BOM.
 - Backend run-port standardisation during debugging: moved testing to port `8010` to avoid stale processes still bound to `8000`.
 - Frontend integration alignment: updated frontend API base URLs to point to backend port `8010` during this debugging cycle.
+
+## 23- 25 Mar 2026 - Backend Upgrades for Upload CV LLM Integration
+
+### compare_cv_to_job() Fixes in ai_service.py
+
+- Removed `response_mime_type: "application/json"` from `compare_cv_to_job()` config —
+  was causing 503 errors (same issue as chat endpoint)
+- Increased `max_output_tokens` from 1000 to 1500 to prevent truncated match summaries
+- Added input truncation at start of method: `cv_text` capped at 12000 chars,
+  `job_description` capped at 6000 chars to avoid large-token stalls
+- Added `max_cv_chars_for_compare` and `max_job_chars_for_compare` instance variables
+  in `__init__` for easy configuration
+
+### Backend Resilience Additions in cv_routes.py
+
+- Added `import asyncio` to routes
+- Added `LLM_TIMEOUT_SECONDS = 30` constant
+- Wrapped `/api/cv/job/analyze-llm` in `asyncio.wait_for()` with 30s timeout —
+  returns 504 on timeout instead of hanging
+- Wrapped `/api/cv/compare` in `asyncio.wait_for()` with 30s timeout
+- Added keyword-based fallback on `/api/cv/compare` when Gemini returns error —
+  returns `CVCompareResponse` with keyword match score instead of 503
+- Added keyword-based fallback on `/api/cv/job/analyze-llm` when Gemini quota exceeded —
+  returns structured `JobAnalysisLLMResponse` from keyword extraction instead of 503
+- Added `print(f"Compare error: ...")` logging so terminal shows actual Gemini failure reason
+- Fixed `/api/cv/chat` route to return `suggested_edit` field:
+  `return CVChatResponse(reply=result["reply"], suggested_edit=result.get("suggested_edit"))`
+
+### Gemini Rate Limit Debugging (25 Mar 2026)
+
+- Compare endpoint returning 503 traced to `429 RESOURCE_EXHAUSTED` from Gemini free tier
+- `gemini-2.5-flash` free tier: 10 requests/minute, ~500/day
+- Quota resets at midnight Pacific Time (8am Irish time)
+- Confirmed working after quota reset via direct Python test:
+
+## 26 Mar - 1 Apr 2026 - CV Parser Overhaul & Upload CV Page Fixes
+
+### CV Parser Complete Rewrite
+
+Rewrote `backend/app/services/cv_parser.py` from scratch to fix critical
+parsing failures across real-world CVs.
+
+**Root causes identified:**
+- `_extract_experience()` only saved the last job entry — `experiences.append()`
+  was never called inside the loop, only after it
+- Section boundary detection used exact string matching — failed on ALL CAPS
+  headers (e.g. `WORK EXPERIENCE`, `EDUCATION`) common in real PDFs
+- `lines[1:]` in `_extract_experience` skipped the heading but the section
+  content from `_identify_section_boundaries` already strips the heading,
+  so the first job entry was always dropped
+- Skills section only matched ~30 hardcoded CS keywords — missed most STEM fields
+- `honours` in degree titles (e.g. "BSc (Honours)") was matching the achievements
+  section keyword, stealing the education section content
+
+**Fixes applied:**
+
+`_identify_section_boundaries()`:
+- Replaced substring matching (`kw in lower`) with word-by-word matching
+- Keyword must appear as contiguous words in the line with max 2 extra words
+- Prevents "BSc (Honours) in Computer Science" matching `honours`
+- Handles "OTHER WORK EXPERIENCE" → maps to `experience`
+- Duplicate section headings (WORK EXPERIENCE + OTHER WORK EXPERIENCE)
+  now concatenated rather than dropped
+
+`_extract_experience()`:
+- Fixed `lines[1:]` → `lines` (heading already stripped by section slicer)
+- Fixed `i > 1` → `i > 0` in FORMAT B lookback
+- Added FORMAT B support: company name on separate line above title + date
+  (e.g. Fidelity Investments on one line, then "Software Engineer Intern Jan 2025")
+- Improved date pattern to match full month names ("January 2025 – August 2025")
+- Added bullet merging in `save_current()` to join wrapped PDF lines
+
+`_extract_skills()`:
+- Expanded from ~30 CS keywords to 200+ across 6 STEM categories:
+  Software/Web/DevOps, Data Science/AI, Electronics/Hardware,
+  Mechanical/Civil Engineering, Biology/Lab Sciences, General Engineering
+- Raw skills section scraper tightened to avoid grabbing paragraph text
+  (max 3 words, no punctuation, no sentence-length items)
+
+`_identify_section_boundaries()` — dynamic section handling:
+- Added `i > 5` guard to prevent name being detected as a section header
+- Added `'it'` to skills keywords to catch "IT:" headings
+- Achievements explicitly inserted into `dynamic_sections` list
+- `personal profile` added to summary keywords
+
+`_extract_education()`:
+- Added skip for lines containing `projects:`, `modules:`, `developed`,
+  `implemented`, `leaving cert` to avoid project descriptions being parsed
+  as degree entries
+
+**Verified against two real CVs:**
+- Kelly's CV (PDF, paragraph-style skills, mixed-format education)
+- Oisín's CV (PDF, ALL CAPS headers, FORMAT B experience, projects section)
+
+Both now parse correctly with no warnings.
+
+---
+
+### models.py Updates
+
+- Added `dynamic_sections: List[dict] = Field(default_factory=list)` to `CVData`
+- Changed `parsed_data: Optional[CVData]` → `parsed_data: Optional[dict]`
+  in `CVUploadResponse` to allow dynamic_sections through without Pydantic stripping
+
+---
+
+### cv_routes.py Updates (Copilot collaboration)
+
+- Added `BackgroundTasks` for safe temp file cleanup after response sent
+- Extracted magic numbers to named constants (`FILE_READ_CHUNK_BYTES`, etc.)
+- Added `_extract_role_hint()` helper for better fallback role title detection
+- `enhance_bullet_point` and `chat_with_cv_assistant` now wrapped in
+  `asyncio.wait_for()` with timeout — previously called synchronously
+- Added `DEBUG: Real AI Error was ->` print in compare route for diagnostics
+- Health check now reports live service status
+
+---
+
+### ai_service.py Updates
+
+- Added `enhance_cv_with_chat()` method — gap-filling chat for Upload CV page
+  (previously missing despite route calling it, causing all chat to fall back)
+- Added `load_dotenv()` at top of file before class definition to ensure
+  `GEMINI_API_KEY` is loaded before singleton instantiates
+- Model changed from `models/gemini-2.5-flash` → `gemini-3.1-flash-lite-preview`
+  (higher free-tier quota, no `models/` prefix required for newer SDK)
+- Removed `response_mime_type: "application/json"` from `analyze_job_description`
+  repair call (was causing 503s)
+- Removed `"thinking_config": {"thinking_level": "none"}` from
+  `enhance_cv_with_chat` config — invalid value causing 400 errors
+- Added `gap_index` field to enhance chat response so checklist auto-ticks
+- Improved `compare_cv_to_job` prompt — explicit instruction to always return
+  non-empty `gaps` and `strengths` arrays with minimum 3 items each
+
+---
+
+### UploadCV.tsx Updates
+
+- Added `DynamicSection` interface and `dynamic_sections` field to `ParsedCV`
+- Added `certifications` field to `ParsedCV`
+- Added `PreviewSection` helper component for consistent section rendering
+- Replaced `CVPreview` component — now renders all sections including
+  `dynamic_sections` (Achievements, Interests, Awards etc.)
+- Added `readErrorMessage()` helper for better API error surfacing
+- Added `toStringArray()` — handles gaps/strengths returned as string vs array
+- Added `normalizeComparison()` — normalises compare response, falls back to
+  `matched_keywords`/`missing_keywords` when AI arrays are empty
+- `gap_index` from chat response now used to auto-tick gap checklist
+- `UPLOAD_TIMEOUT_MS` constant added (60 seconds)
+- Added `analysisNotice` state — shows amber notice when fallback mode active
+- Added AI Mode / Fallback Mode badge to success banner
+
+---
+
+### Gemini API Key Loading Fix
+
+**Issue:** `GEMINI_API_KEY` was not loading when uvicorn started via Copilot's
+terminal command (`python -m uvicorn app.main:app --app-dir backend` from root).
+This caused `ai_service` singleton to instantiate with `client = None` before
+`main.py` ran `load_dotenv()`.
+
+**Fix:** Added explicit `load_dotenv()` call at top of `ai_service.py` using
+`Path(__file__).resolve().parents[2] / ".env"` so the key loads regardless of
+how or from where uvicorn is started.
+
+**Root cause of recurring fallback:** Multiple Copilot-spawned uvicorn processes
+running simultaneously on port 8000, with the active one loading an old version
+of `ai_service.py` that had `models/gemini-3.1-flash-lite` (missing `-preview`)
+as the model name. Gemini returned 404 NOT_FOUND on every compare call.
+
+**Fix:** Killed all processes, started single clean uvicorn in one terminal.
+
+---
+
+### Gemini Model Name Fix
+
+**Issue:** Model string `gemini-3.1-flash-lite` was being sent (missing `-preview`)
+causing 404 NOT_FOUND from Gemini API on every compare and analyze call.
+
+**Fix:** Confirmed correct string is `gemini-3.1-flash-lite-preview` (no `models/`
+prefix — the newer SDK adds it automatically).
