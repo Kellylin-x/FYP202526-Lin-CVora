@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from reportlab.pdfgen import canvas
 from docx import Document
 from app.models.cv_models import CVData, PersonalInfo, Skills
+from app.services.cv_parser import cv_parser
 
 from app.main import app
 
@@ -12,28 +13,48 @@ from app.main import app
 client = TestClient(app)
 
 def _mock_parsed_cv():
-    mock_cv = CVData(
-        personal_info=PersonalInfo(
-            full_name="John Doe",
-            email="john@example.com",
-            phone="+353 85 123 4567",
-            location="Dublin, Ireland"
-        ),
-        professional_summary="Experienced software engineer.",
-        skills=Skills(technical=["Python", "React"], soft=["Teamwork"])
-    )
-    return {'success': True, 'parsed_data': mock_cv, 'warnings': []}
+    return {
+        'success': True,
+        'parsed_data': {
+            'personal_info': {
+                'full_name': 'John Doe',
+                'email': 'john@example.com',
+                'phone': '+353 85 123 4567',
+                'location': 'Dublin, Ireland'
+            },
+            'professional_summary': 'Experienced software engineer.',
+            'skills': {'technical': ['Python', 'React'], 'soft': ['Teamwork']},
+            'experience': [],
+            'education': [],
+            'projects': [],
+            'certifications': [],
+            'dynamic_sections': []
+        },
+        'warnings': [],
+        'raw_text': ''
+    }
 
 def _mock_parsed_cv_with_warnings():
-    mock_cv = CVData(
-        personal_info=PersonalInfo(
-            full_name="Unknown", email="unknown@example.com",
-            phone="0000000000", location="Unknown"
-        ),
-        skills=Skills()
-    )
-    return {'success': True, 'parsed_data': mock_cv,
-            'warnings': ["No experience section found", "No skills detected"]}
+    return {
+        'success': True,
+        'parsed_data': {
+            'personal_info': {
+                'full_name': 'Unknown',
+                'email': 'unknown@example.com',
+                'phone': '0000000000',
+                'location': 'Unknown'
+            },
+            'professional_summary': '',
+            'skills': {'technical': [], 'soft': []},
+            'experience': [],
+            'education': [],
+            'projects': [],
+            'certifications': [],
+            'dynamic_sections': []
+        },
+        'warnings': ['No experience section found', 'No skills detected'],
+        'raw_text': ''
+    }
 
 class TestCVUploadEndpoint:
     """Integration tests for POST /api/cv/upload"""
@@ -58,9 +79,8 @@ class TestCVUploadEndpoint:
         """Test uploading a valid PDF file"""
         pdf_bytes = self._generate_pdf("John Doe\njohn@example.com\nPython Developer")
 
-        with patch('app.api.cv_routes.cv_parser') as mock_parser:
-            mock_parser.parse_pdf.return_value = _mock_parsed_cv()
-
+        with patch('app.api.cv_routes.asyncio.to_thread') as mock_thread:
+            mock_thread.return_value = _mock_parsed_cv()
             response = client.post(
                 "/api/cv/upload",
                 files={"file": ("test_cv.pdf", pdf_bytes, "application/pdf")}
@@ -76,9 +96,8 @@ class TestCVUploadEndpoint:
         """Test uploading a valid DOCX file"""
         docx_bytes = self._generate_docx("Jane Smith\njane@example.com\nSoftware Engineer")
 
-        with patch('app.api.cv_routes.cv_parser') as mock_parser:
-            mock_parser.parse_docx.return_value = _mock_parsed_cv()
-
+        with patch('app.api.cv_routes.asyncio.to_thread') as mock_thread:
+            mock_thread.return_value = _mock_parsed_cv()
             response = client.post(
                 "/api/cv/upload",
                 files={"file": ("test_cv.docx", docx_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
@@ -111,9 +130,8 @@ class TestCVUploadEndpoint:
         """Test that warnings are returned for CVs missing sections"""
         pdf_bytes = self._generate_pdf("Just a name, nothing else here at all.")
 
-        with patch('app.api.cv_routes.cv_parser') as mock_parser:
-            mock_parser.parse_pdf.return_value = _mock_parsed_cv_with_warnings()
-
+        with patch('app.api.cv_routes.asyncio.to_thread') as mock_thread:
+            mock_thread.return_value = _mock_parsed_cv_with_warnings()
             response = client.post(
                 "/api/cv/upload",
                 files={"file": ("minimal_cv.pdf", pdf_bytes, "application/pdf")}
@@ -121,7 +139,6 @@ class TestCVUploadEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        # Minimal CV should trigger warnings about missing sections
         assert isinstance(data['warnings'], list)
         assert len(data['warnings']) > 0
 

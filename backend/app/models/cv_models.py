@@ -137,7 +137,7 @@ class Project(BaseModel):
                 "id": "proj-1",
                 "title": "AI-Powered CV Builder",
                 "description": "Web application that helps users create professional CVs with AI assistance",
-                "technologies": ["React", "TypeScript", "FastAPI", "OpenAI"],
+                "technologies": ["React", "TypeScript", "FastAPI", "Gemini API"],
                 "link": "github.com/username/cv-builder",
                 "achievements": [
                     "Implemented AI-powered content enhancement",

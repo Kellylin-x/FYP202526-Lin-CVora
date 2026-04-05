@@ -278,16 +278,27 @@ class CVParser:
         if github_match:
             info['github'] = github_match.group(0)
 
-        # Name heuristic: first short line near the top that isn't an email/URL/number
+        # Name heuristic: first short line near the top that isn't an email/URL/number.
+        # We also strip any post-nominal qualifications (e.g. "MA App Psychol, BSc Psychol")
+        # that sometimes appear on the same line as the name in Irish/UK CVs.
+        qual_pattern = re.compile(
+            r',?\s*(MA|MSc|BSc|BA|BEng|MEng|MBA|PhD|Ph\.D|HDip|'
+            r'App\.?\s*Psychol\.?|Psychol\.?|Hons\.?|MRICS|CEng|'
+            r'ACCA|ACA|CFA|CIMA|PMP|CISSP|B\.Sc|M\.Sc)\b.*$',
+            re.IGNORECASE
+        )
         for line in lines[:6]:
             if (
-                len(line) < 60
+                len(line) < 80
                 and '@' not in line
                 and 'http' not in line.lower()
                 and not re.search(r'\d{3,}', line)
                 and not any(line.lower().startswith(kw) for kw in ['skills', 'education', 'experience'])
             ):
-                info['full_name'] = line
+                # Strip qualifications from the end of the name line
+                cleaned_name = qual_pattern.sub('', line).strip().rstrip(',').strip()
+                if cleaned_name:
+                    info['full_name'] = cleaned_name
                 break
 
         # Location — try labelled patterns first, then "City, Country" pattern
@@ -465,23 +476,28 @@ class CVParser:
                     i += 1
                     continue
 
-                window = ' '.join(lines[max(0, i - 1): min(len(lines), i + 4)])
-
-                inst_match = inst_pattern.search(window)
+                # Only look for the institution in the part BEFORE the em dash,
+                # so we don't pick up the repeated text that some DOCX exports add.
+                clean_line = re.split(r'\s*[—–]\s*', line)[0].strip()
+                clean_window = ' '.join(
+                    [clean_line] + lines[max(0, i - 1): min(len(lines), i + 2)]
+                )
+                
+                inst_match = inst_pattern.search(clean_window)
                 institution = ''
                 if inst_match:
                     start = inst_match.start()
-                    institution = window[start:start + 60].split('\n')[0].strip()
+                    institution = clean_window[start:start + 60].split('\n')[0].strip()
 
-                years = year_pattern.findall(window)
+                years = year_pattern.findall(clean_window)
                 graduation = years[-1] if years else ''
 
-                grade_match = grade_pattern.search(window)
+                grade_match = grade_pattern.search(clean_window)
                 grade = grade_match.group(0) if grade_match else None
 
                 education.append({
                     'id': f'edu-{len(education) + 1}',
-                    'degree': line.strip(),
+                    'degree': re.split(r'\s*[—–]\s*', line)[0].strip(),
                     'institution': institution,
                     'location': '',
                     'graduation_date': graduation,

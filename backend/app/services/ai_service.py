@@ -28,8 +28,9 @@ class AIService:
         Args:
             api_key: Gemini API key (if None, reads from GEMINI_API_KEY env var)
         """
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.api_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY")
         if _GENAI_IMPORT_ERROR is not None:
+
             print(
                 "WARNING: google-genai SDK not available in current interpreter. "
                 f"Python: {sys.executable}. "
@@ -136,7 +137,7 @@ class AIService:
         suggested_edit shapes:
           { "field": "professional_summary", "value": "..." }
           { "field": "experience_bullet", "exp_id": "abc123", "bullet_index": 0, "value": "..." }
-          { "field": "skills_add", "skill_type": "technical", "values": ["Python", "FastAPI"] }
+          { "field": "skills_add", "skill_type": "hard", "values": ["Python", "FastAPI"] }
           { "field": "project_description", "project_id": "xyz789", "value": "..." }
 
         Args:
@@ -189,7 +190,7 @@ Career focus: {target.get('career_focus', 'not specified')}
 CURRENT CV CONTENT:
 EXPERIENCE:{exp_text if exp_text else ' None added yet'}
 EDUCATION:{edu_text if edu_text else ' None added yet'}
-TECHNICAL SKILLS: {', '.join(skills.get('technical', [])) or 'None added yet'}
+HARD SKILLS: {', '.join(skills.get('hard', [])) or 'None added yet'}
 SOFT SKILLS: {', '.join(skills.get('soft', [])) or 'None added yet'}
 PROJECTS:{proj_text if proj_text else ' None added yet'}
 PROFESSIONAL SUMMARY: {summary or 'Not written yet'}
@@ -212,7 +213,7 @@ For a specific experience bullet (use the ID and index shown above):
   {{"field": "experience_bullet", "exp_id": "the-exp-id", "bullet_index": 0, "value": "improved bullet text"}}
 
 For adding skills:
-  {{"field": "skills_add", "skill_type": "technical", "values": ["Skill1", "Skill2"]}}
+  {{"field": "skills_add", "skill_type": "hard", "values": ["Skill1", "Skill2"]}}
 
 For a project description (use the project ID shown above):
   {{"field": "project_description", "project_id": "the-project-id", "value": "new description"}}
@@ -466,7 +467,7 @@ Text:
             for b in bullets[:3]:  # Only show first 3 bullets to keep prompt short
                 exp_text += f"\n      • {b}"
 
-        tech_skills = ", ".join(skills.get("technical") or []) or "none listed"
+        hard_skills = ", ".join(skills.get("hard") or []) or "none listed"
         soft_skills = ", ".join(skills.get("soft") or []) or "none listed"
 
         # Format the conversation history so the AI has memory of what was said
@@ -487,7 +488,7 @@ When they say yes and give details, craft a strong STAR-method CV bullet or sugg
 CURRENT CV SUMMARY:
 Name: {personal.get("full_name", "the user")}
 Professional Summary: {summary or "(none)"}
-Technical Skills: {tech_skills}
+Hard Skills: {hard_skills}
 Soft Skills: {soft_skills}
 Experience: {exp_text or "(none)"}
 
@@ -528,7 +529,7 @@ OR if you have a suggestion ready:
   "gap_index": 0
 }}
 
-For type use: "bullet" (experience bullet), "skill" (add to technical skills), or "summary" (rewrite professional summary).
+For type use: "bullet" (experience bullet), "skill" (add to hard skills), or "summary" (rewrite professional summary).
 For gap_index: use the number from the gaps list above that this suggestion addresses. Use -1 if not addressing a specific gap.
 
 Return ONLY the JSON object:"""

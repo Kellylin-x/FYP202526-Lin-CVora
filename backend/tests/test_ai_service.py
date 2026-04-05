@@ -108,7 +108,8 @@ class TestAIService:
 
     def test_handles_missing_api_key(self):
         """Test behaviour when no API key is configured"""
-        service_no_key = AIService(api_key=None)
+        service_no_key = AIService(api_key="invalid-key-for-testing")
+        service_no_key.client = None
 
         result = service_no_key.enhance_bullet_point(
             text="Did work",
@@ -174,8 +175,8 @@ class TestAIService:
     def test_chat_returns_reply(self, service_with_mock_client):
         """Test that chat returns a reply string on success"""
         service, mock_client = service_with_mock_client
-        self._mock_gemini_response(mock_client, "Here are some tips to improve your bullet points...")
-
+        self._mock_gemini_response(mock_client, '{"reply": "Here are some tips to improve your bullet points...", "suggested_edit": null}')
+        
         result = service.chat_with_cv_context(
             message="How can I improve my bullet points?",
             history=[],
@@ -196,8 +197,8 @@ class TestAIService:
     def test_chat_includes_conversation_history(self, service_with_mock_client):
         """Test that previous conversation history is passed to the model"""
         service, mock_client = service_with_mock_client
-        self._mock_gemini_response(mock_client, "Based on your previous question...")
-
+        self._mock_gemini_response(mock_client, '{"reply": "Based on your previous question...", "suggested_edit": null}')
+        
         history = [
             {"role": "user", "content": "What is the STAR method?"},
             {"role": "assistant", "content": "STAR stands for Situation, Task, Action, Result."}
@@ -218,9 +219,10 @@ class TestAIService:
 
     def test_chat_handles_missing_api_key(self):
         """Test that chat returns an error when no API key is set"""
-        service = AIService(api_key=None)
+        service_no_key = AIService(api_key="invalid-key-for-testing")
+        service_no_key.client = None
 
-        result = service.chat_with_cv_context(
+        result = service_no_key.chat_with_cv_context(
             message="Help me with my CV",
             history=[],
             cv_data={}
