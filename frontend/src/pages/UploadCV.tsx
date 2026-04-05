@@ -25,12 +25,13 @@ import { useNavigate } from 'react-router-dom';
 import {
     Upload, FileText, CheckCircle2, AlertTriangle,
     ArrowLeft, Loader2, X,
-    ChevronDown, ChevronUp, Lightbulb,
+    Lightbulb,
     Monitor, Users, Plus, Star, Clock, DollarSign,
-    TrendingUp, AlertCircle, Bot, Send, Eye, Square, CheckSquare
+    TrendingUp, AlertCircle, Bot, Send, Eye, Square, CheckSquare, Download
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import html2pdf from 'html2pdf.js';
 
 const API_BASE = 'http://localhost:8000';
 const ANALYSIS_TIMEOUT_MS = 30000;
@@ -348,6 +349,20 @@ const PreviewSection: React.FC<{ title: string; children: React.ReactNode }> = (
 
 const CVPreview: React.FC<{ cv: ParsedCV; appliedCount: number }> = ({ cv, appliedCount }) => {
     const p = cv.personal_info || {};
+    const cvRef = useRef<HTMLDivElement>(null);
+
+     const handleExportPDF = () => {
+        const element = cvRef.current;
+        if (!element) return;
+        const options = {
+            margin: 10,
+            filename: `${p.full_name || 'my-cv'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
+        (html2pdf as any)().set(options).from(element).save();
+    };
     const hasContent =
         p.full_name ||
         cv.professional_summary ||
@@ -364,9 +379,18 @@ const CVPreview: React.FC<{ cv: ParsedCV; appliedCount: number }> = ({ cv, appli
     }
  
     return (
-        <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-sm"
-            style={{ fontFamily: 'Georgia, serif' }}
+        <div>
+            <button
+                onClick={handleExportPDF}
+                className="w-full mb-3 flex items-center justify-center gap-2 py-2 px-4 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+                <Download size={14} />
+                Export as PDF
+            </button>
+            <div
+                ref={cvRef}
+                className="bg-white p-6 text-sm"
+                style={{ fontFamily: 'Georgia, serif' }}
         >
             {/* ── Name + Contact ── */}
             {p.full_name && (
@@ -509,6 +533,65 @@ const CVPreview: React.FC<{ cv: ParsedCV; appliedCount: number }> = ({ cv, appli
                     </span>
                 </div>
             )}
+            </div>
+        </div>
+    );
+};
+
+// ── Tabbed right panel: CV Preview + Chat ─────────────────────────────────
+
+const TabbedRightPanel: React.FC<{
+    enhancedCV: ParsedCV | null;
+    appliedCount: number;
+    parsedCV: ParsedCV;
+    gaps: string[];
+    jobDescription: string;
+    onApply: (addition: SuggestedAddition, gapIndex: number) => void;
+}> = ({ enhancedCV, appliedCount, parsedCV, gaps, jobDescription, onApply }) => {
+    const [activeTab, setActiveTab] = useState<'preview' | 'chat'>('chat');
+
+    return (
+        <div className="flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex border-b border-slate-100 flex-shrink-0">
+                <button
+                    onClick={() => setActiveTab('chat')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2
+                        ${activeTab === 'chat'
+                            ? 'text-[#663399] border-b-2 border-[#663399] bg-purple-50/50'
+                            : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                    <Bot size={15} /> AI Chat
+                </button>
+                <button
+                    onClick={() => setActiveTab('preview')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2
+                        ${activeTab === 'preview'
+                            ? 'text-cyan-600 border-b-2 border-cyan-500 bg-cyan-50/50'
+                            : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                    <Eye size={15} /> CV Preview
+                </button>
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-hidden">
+                {activeTab === 'chat' ? (
+                    <EnhancementChatPanel
+                        parsedCV={parsedCV}
+                        gaps={gaps}
+                        jobDescription={jobDescription}
+                        onApply={onApply}
+                    />
+                ) : (
+                    <div className="h-full overflow-y-auto p-4">
+                        {enhancedCV
+                            ? <CVPreview cv={enhancedCV} appliedCount={appliedCount} />
+                            : <p className="text-slate-400 text-sm text-center pt-10">No CV loaded yet.</p>
+                        }
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -724,7 +807,6 @@ export const UploadCV: React.FC = () => {
     const [selectedFile, setSelectedFile]     = useState<File | null>(null);
     const [uploadResult, setUploadResult]     = useState<UploadResponse | null>(null);
     const [jobDescription, setJobDescription] = useState('');
-    const [showJobInput, setShowJobInput]     = useState(false);
     const [llmJobAnalysis, setLlmJobAnalysis] = useState<LLMJobAnalysis | null>(null);
     const [cvComparison, setCvComparison]     = useState<CVComparison | null>(null);
     const [errorMessage, setErrorMessage]     = useState('');
@@ -733,6 +815,7 @@ export const UploadCV: React.FC = () => {
     const [appliedCount, setAppliedCount]     = useState(0);
     // Tracks which gap indices have been addressed via the chat
     const [addressedGaps, setAddressedGaps]   = useState<Set<number>>(new Set());
+    const showJobInput = true;
 
     const validTypes = [
         'application/pdf',
@@ -917,8 +1000,7 @@ export const UploadCV: React.FC = () => {
         setErrorMessage('');
     };
 
-    const hasJobDesc = showJobInput && jobDescription.trim().length >= 50;
-    const hasAnalysisResults = hasJobDesc && (llmJobAnalysis !== null || cvComparison !== null);
+    const hasJobDesc = jobDescription.trim().length >= 50;    const hasAnalysisResults = hasJobDesc && (llmJobAnalysis !== null || cvComparison !== null);
     const isFallbackMode = Boolean(analysisNotice);
 
     return (
@@ -929,14 +1011,16 @@ export const UploadCV: React.FC = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
                     {/* Back button */}
-                    <button onClick={() => navigate('/')}
-                        className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium mb-8 transition-colors group">
-                        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                        Back to Home
-                    </button>
+                    <div className="max-w-4xl mx-auto">
+                        <button onClick={() => navigate('/')}
+                            className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium mb-8 transition-colors group">
+                            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                            Back to Home
+                        </button>
+                    </div>
 
                     {/* Page heading */}
-                    <div className="mb-10">
+                    <div className="mb-10 max-w-4xl mx-auto">
                         <h1 className="text-4xl font-extrabold text-slate-900 mb-3">
                             Enhance Your{' '}
                             <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-cyan-600">Existing CV</span>
@@ -948,7 +1032,7 @@ export const UploadCV: React.FC = () => {
 
                     {/* ── Upload form ── */}
                     {uploadState !== 'success' && (
-                        <div className="max-w-4xl space-y-6">
+                        <div className="max-w-4xl mx-auto space-y-6">
 
                             {/* Drop zone */}
                             <div
@@ -1008,11 +1092,6 @@ export const UploadCV: React.FC = () => {
                             {/* Job description toggle */}
                             {selectedFile && (
                                 <div>
-                                    <button onClick={() => setShowJobInput(!showJobInput)}
-                                        className="flex items-center gap-2 text-cyan-600 hover:text-cyan-700 font-medium text-sm transition-colors">
-                                        {showJobInput ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                        {showJobInput ? 'Hide job description' : '+ Add job description for AI match analysis & enhancement'}
-                                    </button>
 
                                     {showJobInput && (
                                         <div className="mt-3">
@@ -1040,21 +1119,30 @@ export const UploadCV: React.FC = () => {
 
                             {/* Analyse button */}
                             {selectedFile && (
-                                <button onClick={handleUpload}
-                                    className="w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg
-                                        bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600
-                                        text-white flex items-center justify-center gap-3">
-                                    <FileText size={22} />
-                                    Analyse CV
-                                </button>
+                                <div>
+                                    {selectedFile && jobDescription.trim().length < 50 && (
+                                        <p className="text-amber-500 text-sm text-center mb-3">
+                                            Please add a job description (at least 50 characters) to analyse your CV.
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={handleUpload}
+                                        disabled={jobDescription.trim().length < 50}
+                                        className="w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-md hover:shadow-lg
+                                            bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600
+                                            text-white flex items-center justify-center gap-3
+                                            disabled:opacity-40 disabled:cursor-not-allowed">
+                                        <FileText size={22} />
+                                        Analyse CV
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}
 
                     {/* ── Results ── */}
                     {uploadState === 'success' && uploadResult && enhancedCV && (
-                        <div className={`${hasJobDesc && cvComparison ? 'grid grid-cols-1 lg:grid-cols-[1fr_320px_320px] gap-6' : 'max-w-4xl'}`}>
-
+                        <div className={`${hasJobDesc && cvComparison ? 'grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6' : 'max-w-4xl'}`}>
                             {/* ── Left: Results column ── */}
                             <div className="space-y-6 min-w-0">
 
@@ -1308,24 +1396,13 @@ export const UploadCV: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* ── Middle: Live CV Preview ── */}
-                            {hasJobDesc && cvComparison && (
-                                <div className="lg:sticky lg:top-24 lg:self-start space-y-3">
-                                    <h3 className="font-semibold text-slate-700 text-sm flex items-center gap-2">
-                                        <Eye size={16} className="text-slate-400" />
-                                        Live CV Preview
-                                    </h3>
-                                    <div className="max-h-[calc(100vh-140px)] overflow-y-auto">
-                                        <CVPreview cv={enhancedCV} appliedCount={appliedCount} />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* ── Right: Enhancement Chat ── */}
+                            {/* ── Right: Tabbed CV Preview + Chat ── */}
                             {hasJobDesc && cvComparison && (
                                 <div className="lg:sticky lg:top-24 lg:self-start" style={{ height: 'calc(100vh - 140px)' }}>
-                                    <EnhancementChatPanel
-                                        parsedCV={enhancedCV}
+                                    <TabbedRightPanel
+                                        enhancedCV={enhancedCV}
+                                        appliedCount={appliedCount}
+                                        parsedCV={enhancedCV!}
                                         gaps={cvComparison.gaps}
                                         jobDescription={jobDescription}
                                         onApply={handleApplyAddition}

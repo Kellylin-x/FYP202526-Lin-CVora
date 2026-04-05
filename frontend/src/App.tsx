@@ -18,7 +18,7 @@ function LandingPage() {
       <Header />
       <main>
         <Hero />
-        <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <section id="features" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
           <div className="grid md:grid-cols-2 gap-8 lg:gap-12 max-w-5xl mx-auto">
             <FeatureCard
               title="Enhance Existing CV"

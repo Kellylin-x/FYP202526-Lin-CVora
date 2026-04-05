@@ -17,10 +17,12 @@ import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ArrowRight, Check, Plus, Trash2, ChevronDown, ChevronUp,
     User, Briefcase, GraduationCap, Wrench, Sparkles, Loader2, FileText,
-    X, MessageCircle, Send, Bot, Eye, Mail, Phone, MapPin, Linkedin, Github, Globe
+    X, Send, Bot, Eye, Mail, Phone, MapPin, Linkedin, Github, Globe,
+    Trophy, Heart, Download
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import html2pdf from 'html2pdf.js';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -62,7 +64,7 @@ export interface Education {
 }
 
 export interface Skills {
-    technical: string[];
+    hard: string[];
     soft: string[];
 }
 
@@ -74,6 +76,12 @@ export interface Project {
     link: string;
 }
 
+export interface Achievement {
+    id: string;
+    title: string;
+    description: string;
+}
+
 export interface CVFormData {
     personal_info: PersonalInfo;
     target_role: TargetRole;
@@ -82,6 +90,8 @@ export interface CVFormData {
     education: Education[];
     skills: Skills;
     projects: Project[];
+    achievements: Achievement[];
+    hobbies: string[];
 }
 
 /** A single message in the chat — role is 'user' or 'assistant' */
@@ -100,7 +110,7 @@ interface SuggestedEdit {
     value?: string;           // For summary, bullet, project_description
     exp_id?: string;          // For experience_bullet
     bullet_index?: number;    // For experience_bullet
-    skill_type?: 'technical' | 'soft'; // For skills_add
+    skill_type?: 'hard' | 'soft'; // For skills_add
     values?: string[];        // For skills_add
     project_id?: string;      // For project_description
 }
@@ -123,6 +133,10 @@ const emptyProject = (): Project => ({
     id: uid(), title: '', description: '', link: '',
 });
 
+const emptyAchievement = (): Achievement => ({
+    id: uid(), title: '', description: '',
+});
+
 // ── Initial state ──────────────────────────────────────────────────────────
 
 const initialFormData: CVFormData = {
@@ -131,8 +145,10 @@ const initialFormData: CVFormData = {
     professional_summary: '',
     experience: [],
     education: [],
-    skills: { technical: [], soft: [] },
+    skills: { hard: [], soft: [] },
     projects: [],
+    achievements: [],
+    hobbies: [],
 };
 
 // ── Step definitions ───────────────────────────────────────────────────────
@@ -143,7 +159,9 @@ const STEPS = [
     { id: 2, label: 'Experience',  icon: Briefcase },
     { id: 3, label: 'Education',   icon: GraduationCap },
     { id: 4, label: 'Skills',      icon: Wrench },
-    { id: 5, label: 'Summary',     icon: FileText },
+    { id: 5, label: 'Achievements', icon: Trophy },
+    { id: 6, label: 'Hobbies',     icon: Heart },
+    { id: 7, label: 'Summary',     icon: FileText }
 ];
 
 // ── Stepper ────────────────────────────────────────────────────────────────
@@ -231,7 +249,10 @@ const PersonalInfoStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) =
 
     return (
         <StepPanel title="Personal Information" subtitle="Your contact details — these appear at the top of your CV.">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+           <p className="text-red-500 font-semibold text-sm mb-4">
+            ⚠ Please ensure names, locations and titles are correctly capitalised.
+            </p>
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {fields.map(({ label, field, placeholder, required, fullWidth }) => (
                     <Field key={field} label={label} required={required} fullWidth={fullWidth}>
                         <Input value={data.personal_info[field]} onChange={(e) => update(field, e.target.value)} placeholder={placeholder} />
@@ -493,7 +514,7 @@ const EducationCard: React.FC<{
                             <Input value={edu.grade} onChange={(e) => update('grade', e.target.value)} placeholder="First Class Honours (Expected)" />
                         </Field>
                     </div>
-                    <Field label="Relevant Modules" hint="Press Enter to add a module.">
+                    <Field label="Relevant Modules" hint="Press enter to add one module at a time.">
                         <div className="flex flex-wrap gap-2 mb-2">
                             {edu.relevant_modules.map(m => (
                                 <span key={m} className="bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
@@ -588,8 +609,8 @@ const TagInput: React.FC<{
 };
 
 const SkillsStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => void }> = ({ data, onChange }) => {
-    const addTech    = (t: string) => onChange({ ...data, skills: { ...data.skills, technical: [...data.skills.technical, t] } });
-    const removeTech = (t: string) => onChange({ ...data, skills: { ...data.skills, technical: data.skills.technical.filter(x => x !== t) } });
+    const addHard    = (t: string) => onChange({ ...data, skills: { ...data.skills, hard: [...data.skills.hard, t] } });
+    const removeHard = (t: string) => onChange({ ...data, skills: { ...data.skills, hard: data.skills.hard.filter(x => x !== t) } });
     const addSoft    = (t: string) => onChange({ ...data, skills: { ...data.skills, soft: [...data.skills.soft, t] } });
     const removeSoft = (t: string) => onChange({ ...data, skills: { ...data.skills, soft: data.skills.soft.filter(x => x !== t) } });
 
@@ -601,16 +622,16 @@ const SkillsStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => void
     return (
         <StepPanel title="Skills & Projects" subtitle="Add your skills and any notable projects — personal, academic, or professional.">
             <div className="space-y-6">
-                {/* Technical skills tag input */}
-                <TagInput label="Technical Skills" tags={data.skills.technical} color="purple"
-                    placeholder="e.g. Python, React, Docker..." onAdd={addTech} onRemove={removeTech} />
-
+                {/* Hard skills tag input */}
+                <TagInput label="Hard Skills" tags={data.skills.hard} color="purple"
+                    placeholder="e.g. Python, React, CAD..." onAdd={addHard} onRemove={removeHard} />
+                <p className="text-xs text-slate-400 mt-1 mb-3">Type one skill at a time and press Enter or click Add.</p>
                 <div className="border-t border-slate-100" />
 
                 {/* Soft skills tag input */}
                 <TagInput label="Soft Skills" tags={data.skills.soft} color="cyan"
                     placeholder="e.g. Team Leadership, Communication..." onAdd={addSoft} onRemove={removeSoft} />
-
+                <p className="text-xs text-slate-400 mt-1">Type one skill at a time and press Enter or click Add.</p>
                 <div className="border-t border-slate-100" />
 
                 {/* Projects section */}
@@ -668,7 +689,103 @@ const SkillsStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => void
     );
 };
 
-// ── Step 5: Summary ────────────────────────────────────────────────────────
+// ── Step 5: Achievements & Hobbies ────────────────────────────────────────
+
+const AchievementsStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => void }> = ({ data, onChange }) => {
+    const [hobbyInput, setHobbyInput] = useState('');
+
+    const addAchievement    = () => onChange({ ...data, achievements: [...data.achievements, emptyAchievement()] });
+    const removeAchievement = (id: string) => onChange({ ...data, achievements: data.achievements.filter(a => a.id !== id) });
+    const updateAchievement = (id: string, field: keyof Achievement, value: string) =>
+        onChange({ ...data, achievements: data.achievements.map(a => a.id === id ? { ...a, [field]: value } : a) });
+
+    const addHobby    = () => {
+        const v = hobbyInput.trim();
+        if (v && !data.hobbies.includes(v)) onChange({ ...data, hobbies: [...data.hobbies, v] });
+        setHobbyInput('');
+    };
+    const removeHobby = (h: string) => onChange({ ...data, hobbies: data.hobbies.filter(x => x !== h) });
+
+    return (
+        <StepPanel title="Achievements & Hobbies" subtitle="Optional — awards, certifications, volunteering, or interests that show who you are.">
+            <div className="space-y-6">
+
+                {/* Achievements */}
+                <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Achievements & Certifications</label>
+                    <p className="text-xs text-slate-400 mb-3">Awards, certifications, volunteering, publications — anything worth highlighting.</p>
+                    <div className="space-y-3">
+                        {data.achievements.map((a) => (
+                            <div key={a.id} className="border border-slate-200 rounded-2xl p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={a.title}
+                                        onChange={(e) => updateAchievement(a.id, 'title', e.target.value)}
+                                        placeholder="e.g. Dean's List, AWS Certified, Best Final Year Project"
+                                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700
+                                            placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-[#7a3db5] transition-all"
+                                    />
+                                    <button onClick={() => removeAchievement(a.id)}
+                                        className="w-9 h-9 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 flex items-center justify-center transition-all flex-shrink-0">
+                                        <Trash2 size={15} />
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={a.description}
+                                    onChange={(e) => updateAchievement(a.id, 'description', e.target.value)}
+                                    placeholder="Brief description (optional) — e.g. Awarded for academic excellence in Year 3"
+                                    rows={2}
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700
+                                        placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-[#7a3db5] resize-none transition-all"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={addAchievement}
+                        className="mt-3 w-full py-3 rounded-2xl border-2 border-dashed border-purple-200 text-[#663399] font-semibold text-sm
+                            hover:border-[#7a3db5] hover:bg-purple-50 transition-all flex items-center justify-center gap-2">
+                        <Plus size={16} /> Add Achievement
+                    </button>
+                </div>
+
+                <div className="border-t border-slate-100" />
+
+                {/* Hobbies */}
+                <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1">Hobbies & Interests</label>
+                    <p className="text-xs text-slate-400 mb-3">Optional — shows personality. Keep it brief and genuine.</p>
+                    <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
+                        {data.hobbies.map(h => (
+                            <span key={h} className="bg-cyan-100 text-cyan-700 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                                {h}
+                                <button onClick={() => removeHobby(h)} className="hover:text-cyan-900 transition-colors"><X size={11} /></button>
+                            </span>
+                        ))}
+                        {data.hobbies.length === 0 && <span className="text-xs text-slate-300 py-1">None added yet</span>}
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={hobbyInput}
+                            onChange={(e) => setHobbyInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addHobby(); } }}
+                            placeholder="e.g. Open source contributing, Rock climbing, Chess..."
+                            className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 placeholder-slate-300
+                                focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-[#7a3db5] transition-all"
+                        />
+                        <button onClick={addHobby}
+                            className="px-4 py-2.5 rounded-xl bg-purple-100 text-[#4d2673] font-bold text-sm hover:bg-purple-200 transition-colors">
+                            Add
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </StepPanel>
+    );
+};
+
+// ── Step 6: Summary ────────────────────────────────────────────────────────
 
 const SummaryStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => void }> = ({ data, onChange }) => (
     <StepPanel title="Professional Summary"
@@ -924,10 +1041,29 @@ const ChatPanel: React.FC<{
 const CVPreview: React.FC<{ formData: CVFormData; onClose: () => void }> = ({ formData, onClose }) => {
     const { personal_info: p, target_role, professional_summary, experience, education, skills } = formData;
 
+    // ref pointing at the white CV document div so we know what to export
+    const cvRef = useRef<HTMLDivElement>(null);
+
+    const handleExportPDF = () => {
+        const element = cvRef.current;
+        if (!element) return;
+
+        // html2pdf turns the div into a downloadable A4 PDF
+        const options = {
+            margin: 10,
+            filename: `${p.full_name || 'my-cv'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        };
+        (html2pdf as any)().set(options).from(element).save();
+    };
+
     const hasContact = p.email || p.phone || p.location || p.linkedin || p.github || p.website;
     const hasExperience = experience.some(e => e.job_title || e.company);
     const hasEducation = education.some(e => e.degree || e.institution);
-    const hasTechnical = skills.technical.length > 0;
+    const hasHard = skills.hard.length > 0;
     const hasSoft = skills.soft.length > 0;
 
     return (
@@ -944,15 +1080,27 @@ const CVPreview: React.FC<{ formData: CVFormData; onClose: () => void }> = ({ fo
                         <p className="text-purple-200 text-xs">Updates as you type</p>
                     </div>
                 </div>
-                <button onClick={onClose}
-                    className="text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10">
-                    <X size={18} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Export button — only show if there's something worth downloading */}
+                    {p.full_name && (
+                        <button
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                            <Download size={13} />
+                            Export PDF
+                        </button>
+                    )}
+                    <button onClick={onClose}
+                        className="text-white/70 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10">
+                        <X size={18} />
+                    </button>
+                </div>
             </div>
 
             {/* CV document — scrollable */}
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
-                <div className="bg-white shadow-sm rounded-xl p-8 min-h-full" style={{ fontFamily: 'Georgia, serif' }}>
+                <div ref={cvRef} className="bg-white shadow-sm rounded-xl p-8 min-h-full" style={{ fontFamily: 'Georgia, serif' }}>
 
                     {/* Empty state — shown before any data is entered */}
                     {!p.full_name && !professional_summary && !hasExperience && (
@@ -1092,15 +1240,15 @@ const CVPreview: React.FC<{ formData: CVFormData; onClose: () => void }> = ({ fo
                     )}
 
                     {/* ── Skills ── */}
-                    {(hasTechnical || hasSoft) && (
+                    {(hasHard || hasSoft) && (
                         <div className="mb-5">
                             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
                                 Skills
                             </h2>
-                            {hasTechnical && (
+                            {hasHard && (
                                 <div className="mb-2">
-                                    <span className="text-xs font-bold text-slate-700">Technical: </span>
-                                    <span className="text-xs text-slate-600">{skills.technical.join(' · ')}</span>
+                                    <span className="text-xs font-bold text-slate-700">Hard Skills: </span>
+                                    <span className="text-xs text-slate-600">{skills.hard.join(' · ')}</span>
                                 </div>
                             )}
                             {hasSoft && (
@@ -1111,7 +1259,88 @@ const CVPreview: React.FC<{ formData: CVFormData; onClose: () => void }> = ({ fo
                             )}
                         </div>
                     )}
+
+                    {/* Achievements */}
+                    {formData.achievements.filter(a => a.title).length > 0 && (
+                        <div className="mb-5">
+                            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-3 border-b border-slate-200 pb-1">
+                                Achievements/Certifications
+                            </h2>
+                            <div className="space-y-2">
+                                {formData.achievements.filter(a => a.title).map(a => (
+                                    <div key={a.id}>
+                                        <p className="text-xs font-bold text-slate-800">{a.title}</p>
+                                        {a.description && <p className="text-xs text-slate-600 mt-0.5">{a.description}</p>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Hobbies */}
+                    {formData.hobbies.length > 0 && (
+                        <div className="mb-5">
+                            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest mb-2 border-b border-slate-200 pb-1">
+                                Hobbies & Interests
+                            </h2>
+                            <p className="text-xs text-slate-600">{formData.hobbies.join(' · ')}</p>
+                        </div>
+                    )}
+
+                    
                 </div>
+            </div>
+        </div>
+    );
+};
+
+const TabbedWizardPanel: React.FC<{
+    formData: CVFormData;
+    onApplyEdit: (edit: SuggestedEdit) => void;
+    messages: ChatMessage[];
+    onMessagesChange: (msgs: ChatMessage[]) => void;
+}> = ({ formData, onApplyEdit, messages, onMessagesChange }) => {
+    const [activeTab, setActiveTab] = useState<'chat' | 'preview'>('preview');
+
+    return (
+        <div className="flex flex-col h-full bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+            {/* Tab bar */}
+            <div className="flex border-b border-slate-100 flex-shrink-0">
+                <button
+                    onClick={() => setActiveTab('chat')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2
+                        ${activeTab === 'chat'
+                            ? 'text-[#663399] border-b-2 border-[#663399] bg-purple-50/50'
+                            : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                    <Bot size={15} /> AI Chat
+                </button>
+                <button
+                    onClick={() => setActiveTab('preview')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors flex items-center justify-center gap-2
+                        ${activeTab === 'preview'
+                            ? 'text-[#663399] border-b-2 border-[#663399] bg-purple-50/50'
+                            : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                    <Eye size={15} /> CV Preview
+                </button>
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-hidden">
+                {activeTab === 'chat' ? (
+                    <ChatPanel
+                        formData={formData}
+                        onClose={() => {}}
+                        onApplyEdit={onApplyEdit}
+                        messages={messages}
+                        onMessagesChange={onMessagesChange}
+                    />
+                ) : (
+                    <div className="h-full overflow-y-auto">
+                        <CVPreview formData={formData} onClose={() => {}} />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -1152,13 +1381,10 @@ export const CVBuilder: React.FC = () => {
     // Chat and preview panel visibility — only one can be open at a time during wizard
     // After finishing, both can be open side by side
     const [chatOpen, setChatOpen]       = useState(false);
-    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewOpen, setPreviewOpen] = useState(true);
 
     // Chat messages lifted to parent so they persist when panel is closed/reopened
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-
-    const toggleChat    = () => { setChatOpen(o => !o); if (!wizardFinished) setPreviewOpen(false); };
-    const togglePreview = () => { setPreviewOpen(o => !o); if (!wizardFinished) setChatOpen(false); };
 
     const totalSteps = STEPS.length;
 
@@ -1193,6 +1419,12 @@ export const CVBuilder: React.FC = () => {
     };
 
     const applyEdit = (edit: SuggestedEdit) => {
+        // Safety check — ignore edits with unrecognised field types
+        const validFields = ['professional_summary', 'experience_bullet', 'skills_add', 'project_description'];
+        if (!edit.field || !validFields.includes(edit.field)) {
+            console.warn('Ignored unrecognised suggested edit:', edit);
+            return;
+        }
         switch (edit.field) {
             case 'professional_summary':
                 if (edit.value) setFormData(prev => ({ ...prev, professional_summary: edit.value! }));
@@ -1238,7 +1470,8 @@ export const CVBuilder: React.FC = () => {
             case 2: return <ExperienceStep   data={formData} onChange={setFormData} />;
             case 3: return <EducationStep    data={formData} onChange={setFormData} />;
             case 4: return <SkillsStep       data={formData} onChange={setFormData} />;
-            case 5: return <SummaryStep      data={formData} onChange={setFormData} />;
+            case 5: return <AchievementsStep data={formData} onChange={setFormData} />;
+            case 6: return <SummaryStep      data={formData} onChange={setFormData} />;
             default: return null;
         }
     };
@@ -1313,26 +1546,6 @@ export const CVBuilder: React.FC = () => {
                                     </h1>
                                     <p className="text-slate-500 text-lg">Step-by-step, with AI to help you along the way.</p>
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                                    <button onClick={togglePreview}
-                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm
-                                            ${previewOpen
-                                                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                                : 'bg-white border border-slate-200 text-slate-600 hover:border-purple-300 hover:text-[#4d2673]'
-                                            }`}>
-                                        <Eye size={16} />
-                                        {previewOpen ? 'Hide Preview' : 'Preview CV'}
-                                    </button>
-                                    <button onClick={toggleChat}
-                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-sm
-                                            ${chatOpen
-                                                ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                                                : 'bg-gradient-to-r from-[#663399] to-[#4d2673] text-white hover:from-[#4d2673] hover:to-violet-700'
-                                            }`}>
-                                        <MessageCircle size={16} />
-                                        {chatOpen ? 'Hide Assistant' : 'AI Assistant'}
-                                    </button>
-                                </div>
                             </div>
 
                             <Stepper currentStep={currentStep} completedSteps={completedSteps} />
@@ -1342,27 +1555,18 @@ export const CVBuilder: React.FC = () => {
                                 onBack={handleBack} onNext={handleNext}
                                 canProceed={canProceed()} isLastStep={currentStep === totalSteps - 1}
                             />
+                            
                         </div>
 
-                        {/* ── Preview panel ── */}
-                        {previewOpen && (
-                            <div className="w-full lg:w-96 lg:sticky lg:top-32 flex-shrink-0" style={{ height: 'calc(100vh - 10rem)' }}>
-                                <CVPreview formData={formData} onClose={() => setPreviewOpen(false)} />
-                            </div>
-                        )}
-
-                        {/* ── Chat panel ── */}
-                        {chatOpen && (
-                            <div className="w-full lg:w-96 lg:sticky lg:top-32 flex-shrink-0" style={{ height: 'calc(100vh - 10rem)' }}>
-                                <ChatPanel
-                                    formData={formData}
-                                    onClose={() => setChatOpen(false)}
-                                    onApplyEdit={applyEdit}
-                                    messages={chatMessages}
-                                    onMessagesChange={setChatMessages}
-                                />
-                            </div>
-                        )}
+                        {/* ── Tabbed panel ── */}
+                        <div className="w-full lg:w-96 lg:sticky lg:top-32 flex-shrink-0" style={{ height: 'calc(100vh - 10rem)' }}>
+                            <TabbedWizardPanel
+                                formData={formData}
+                                onApplyEdit={applyEdit}
+                                messages={chatMessages}
+                                onMessagesChange={setChatMessages}
+                            />
+                        </div>
                     </div>
                 </div>
             </main>
@@ -1371,4 +1575,3 @@ export const CVBuilder: React.FC = () => {
     );
 };
 
-export default CVBuilder;

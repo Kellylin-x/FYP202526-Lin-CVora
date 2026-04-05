@@ -10,7 +10,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FileText, Search, Star, MessageSquare,
-    ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Lightbulb
+    ChevronDown, ChevronUp, CheckCircle2, Lightbulb
 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
