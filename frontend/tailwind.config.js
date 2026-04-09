@@ -10,14 +10,15 @@ export default {
         sans: ['Inter', 'sans-serif'],
       },
       colors: {
-        // CVora custom gradient colors
         primary: {
-            DEFAULT: '#3b82f6', // blue-500
-            dark: '#1d4ed8',   // blue-700
+            DEFAULT: '#663399',
+            dark: '#4d2673',
+            light: '#7a3db5',
         },
         secondary: {
-            DEFAULT: '#8b5cf6', // violet-500
-            dark: '#6d28d9',   // violet-700
+            DEFAULT: '#663399',
+            dark: '#4d2673',
+            light: '#7a3db5',
         }
       }
     },
