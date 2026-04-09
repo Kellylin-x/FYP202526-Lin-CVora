@@ -1,607 +1,75 @@
-# Frontend Development Log
+# Dev Log
 
-## 3-4 Mar 2026 - Frontend Development Begins
+## Mar 3-4 — Frontend starts
 
-### Context
-Backend fully complete and tested (68 tests passing). Beginning frontend
-development with fully tested API to integrate against.
+Backend had 68 tests passing so started on the frontend properly. Stack is React 19, TypeScript, Tailwind, Vite, React Router v6. Had a landing page, header and footer already from back in Feb.
 
-**Tech stack:** React 19, TypeScript, Tailwind CSS, Vite, React Router v6
-**Existing:** Landing page, Header, Hero, FeatureCard, Footer components
-already built in February alongside initial backend setup.
+Set up routing first — wrapped the app in BrowserRouter, split out a LandingPage component, got `/` and `/upload` routes working. Upload CV button and logo clicks navigate properly now.
 
----
+Built the Upload CV page (`UploadCV.tsx`). Accepts PDF and DOCX, max 10MB, validates on the client side before even hitting the backend. Has a drag and drop zone which was fun to do. Connects to `POST /api/cv/upload`. Shows parsed results — personal info, skills, experience, education — in cards.
 
-### Routing Setup (4 Mar 2026)
-
-**Updated `frontend/src/main.tsx`:**
-- Wrapped app in `BrowserRouter` from react-router-dom
-- Required for all React Router hooks (`useNavigate`, `useRoutes`) to work
-
-**Updated `frontend/src/App.tsx`:**
-- Added `Routes` and `Route` from react-router-dom
-- Extracted landing page content into `LandingPage` component
-- Set up two routes: `/` (landing) and `/upload` (Upload CV page)
-- "Upload CV" button now navigates to `/upload` via `useNavigate`
-- "Start Building" button placeholder (coming soon)
-
-**Updated `frontend/src/components/Header.tsx`:**
-- Replaced `<a href="#">` with `<Link to="/">` from react-router-dom
-- "Get Started" button now navigates to `/upload`
-- Logo click navigates back to home
+CI broke after adding routing because the existing `App.test.tsx` was rendering `<App />` without a Router parent. Fixed by wrapping in `<MemoryRouter>`. CI passing again after that.
 
 ---
 
-### Upload CV Page (3-4 Mar 2026)
+## Mar 4 (continued) — Job Analysis page + Upload CV improvements
 
-**Created `frontend/src/pages/UploadCV.tsx`**
+Added a Job Analysis page. Two flows — paste just a job description and get keywords back, or paste a job description *and* your CV text and get a match score with missing keywords and recommendations. Match score is colour coded (green/amber/red).
 
-Full file upload page connecting to `POST /api/cv/upload` backend endpoint.
+Also added an optional job description field to the Upload CV page. So you can upload your CV and paste a job description in the same flow and see both at once. Tested it with my own CV against a JP Morgan job spec — got 25% which is accurate, my CV is missing Spring, AWS, CI/CD etc.
 
-**UI States:**
-- `idle` — drag and drop zone with upload icon and instructions
-- `dragging` — cyan border highlight and scale animation on drag over
-- `uploading` — spinning loader with "Analysing your CV..." message
-- `error` — red zone with error message and try again option
-- `success` — results display with all parsed CV sections
-
-**File Validation (client-side):**
-- Accepts PDF and DOCX only (validated by MIME type)
-- Maximum 10MB file size
-- Clear error messages for invalid files
-
-**Results Display:**
-- Green success banner with filename
-- Amber warnings box for parser suggestions
-- Personal Information card (name, email, phone, location, linkedin, github)
-- Detected Skills card (technical tags in purple, soft skills in slate)
-- Experience Detected card (job title, company with cyan left border)
-- Education Detected card (degree, institution with purple left border)
-- "Upload a different CV" reset button
-
-**API Integration:**
-- `fetch()` to `http://localhost:8000/api/cv/upload`
-- FormData for multipart file upload
-- Error handling for network failures and backend errors
-- TypeScript interfaces for all API response shapes
-
-**Reusable Components:**
-- `ResultCard` — internal component for consistent section display
-- Accepts icon, title, color (cyan/purple), children
-
-**Design:**
-- Consistent with landing page (cyan/purple scheme, rounded-3xl, slate text)
-- Back button with animated arrow on hover
-- Gradient text heading matching Hero component style
+Built the CV Builder page too. Multi-section form on the left, live preview + AI chat on the right. Has an AI enhance button on each bullet point that calls `/api/cv/enhance-bullet`. Got the basic layout working.
 
 ---
 
-### CI Fix (4 Mar 2026)
+## Mar 6-9 — Job Analysis LLM redesign
 
-**Issue:** GitHub Actions frontend-tests failing after routing was added
-**Root cause:** `App.test.tsx` rendered `<App />` without Router context,
-but App now uses `useRoutes` which requires a Router parent
-**Fix:** Wrapped both test renders in `<MemoryRouter>` from react-router-dom
-**Result:** CI frontend-tests passing again
+Swapped the Job Analysis page from keyword matching to the Gemini LLM endpoint (`/api/cv/job/analyze-llm`). Completely redesigned the results display — now shows a purple header card with job title and company, a TL;DR section, must-have requirements, tech stack badges, nice to haves, soft skills.
+
+Tested with the same JP Morgan job description. Got back job title, TLDR, tech stack (Java, ReactJS, Spring, AWS), soft skills etc. Looks a lot better than the keyword version.
 
 ---
 
-### Current Status (4 Mar 2026)
+## Mar 9-12 — CV Builder wizard rebuild
 
-**Completed:**
-- ✅ React Router setup
-- ✅ Upload CV page with full backend integration
-- ✅ Real CV upload tested and working (Kelly's CV parsed correctly)
-- ✅ CI passing (backend-tests + frontend-tests)
+The original CV Builder was one long form which wasn't great. Rebuilt it as a multi-step wizard based on supervisor feedback. Each step is its own component, all writing to a shared `CVFormData` state so the preview and chat always have the full picture.
 
-**Next Steps:**
-- Job Analysis page (`/job-analysis`)
-- CV Builder page (`/build`) with multi-step form
-- AI chat panel for both Enhance and Build flows
+Steps: Personal Info → Target Role → Experience → Education → Skills & Projects → Summary.
 
+Experience and Education cards are collapsible — start open, collapse once filled. Skills use a tag chip input. Summary is last on purpose so you have context to write it by then.
 
-## 4 Mar 2026 (continued) - Job Analysis Page and Upload CV Enhancements
+Added an AI chat panel (`ChatPanel`). Sends full CV data with each request so answers are specific to what you've actually written. Suggested prompt chips shown before first message. Enter to send. Auto-scrolls to latest message.
 
-### Job Analysis Page
+Also added a CV Preview panel that renders your actual CV in real time using Georgia font. Both panels toggle — only one open at a time while in the wizard, both open side by side after you finish.
 
-**Created `frontend/src/pages/JobAnalysis.tsx`**
+When you click Finish the wizard is replaced with a full two-column layout: preview on the left, chat on the right.
 
-Standalone page connecting to `POST /api/cv/job/analyze` backend endpoint.
+Test suite updated — rewrote all the AI service mocks from OpenAI pattern to Gemini pattern. Added 5 new chat tests. Up to 73 passing.
 
-**Two flows supported:**
-
-Flow 1 — Job description only:
-- Extracts STEM keywords from job posting
-- Displays extracted keywords as purple tags
-- Recommends uploading CV for match score
-
-Flow 2 — Job description + CV text:
-- Displays match score (0-100%) with colour coded progress bar
-- Green (70%+) Strong Match, Amber (40-69%) Partial Match, Red (<40%) Weak Match
-- Matched keywords shown in green tags
-- Missing keywords shown in amber tags with advice to add if applicable
-- Numbered recommendations list
-
-**UI Features:**
-- Collapsible CV text input via toggle button
-- Character counter with encouragement to paste full job description
-- Colour coded `AnalysisCard` reusable component (green, amber, purple, red variants)
-- "Analyse a different job" reset button
-
-**API Integration:**
-- `fetch()` to `http://localhost:8000/api/cv/job/analyze`
-- JSON body with `job_description` and optional `cv_text`
-- Full TypeScript interfaces for `AnalysisResult`
-
-**Routing:**
-- Added `/job-analysis` route to `App.tsx`
-- Added third feature card "Analyse Job" to landing page grid (now 3 columns)
-- Added `/build` placeholder route for CV Builder
+Had to change the API base URL to port 8010 temporarily during integration because stale uvicorn processes were serving old code from 8000.
 
 ---
 
-### Upload CV Page — Job Description Enhancement
+## Mar 12 — Tips page + colour update
 
-**Updated `frontend/src/pages/UploadCV.tsx`**
+Added a Tips & Guidance page with four tabbed sections: CV Writing, ATS Advice, STAR Method, Interview Tips. Each section has collapsible tip cards. Had a bug where cards in a 2-column grid appeared to open the wrong one — fixed it by switching to single column and adding the active section to card keys so they remount on tab switch.
 
-Added optional job description field to the upload flow.
+Added it to the landing page grid as a fourth feature card.
 
-**New Flow:**
-1. User uploads CV file (required)
-2. User optionally expands job description textarea
-3. On submit — calls `/api/cv/upload` then `/api/cv/job/analyze` in sequence
-4. Results show match score, missing keywords, recommendations above parsed CV sections
-
-**Changes:**
-- Added `JobAnalysisResult` TypeScript interface
-- Added `jobDescription`, `showJobInput`, `jobAnalysis` state
-- Added collapsible job description textarea (visible after file selected)
-- Added `raw_text` to `UploadResponse` interface
-- Uses `data.raw_text` for accurate keyword matching instead of extracted skills only
-- `ResultCard` now supports `amber` colour variant
-- Match score card, missing keywords and recommendations displayed above CV sections
-
-**Testing:**
-- Tested with real CV (Kelly's PDF) against JP Morgan Software Engineer job description
-- Match score: 25% (accurate — CV missing Spring, AWS, CI/CD, DevOps, Agile)
-- Missing keywords correctly identified
-- Both flows (with and without job description) tested and working
+Changed the brand colour from Tailwind's purple-500/violet-600 gradient to Rebecca Purple (`#663399`) across the app. Updated FeatureCard, JobAnalysis, CVBuilder, TipsPage. Used Tailwind arbitrary values (`bg-[#663399]`) mostly.
 
 ---
 
-### CV Builder Page
+## Mar 17-19 — Liverpool trip
 
-**Created `frontend/src/pages/CVBuilder.tsx`**
-
-Full CV builder with live preview and AI chat panel.
-
-**Layout:**
-- Left side — scrollable form with all CV sections
-- Right side — sticky panel with live CV preview + AI chat (visible at all times)
-
-**Form Sections:**
-- Personal Information (name, email, phone, location, LinkedIn, GitHub)
-- Target Role (job title being applied for — used to tailor AI suggestions)
-- Professional Summary (textarea with AI chat guidance)
-- Experience — dynamic entries, add/remove positions, add/remove bullet points
-- Education — dynamic entries, add/remove qualifications
-- Skills — technical and soft skills, dynamic add/remove
-
-**AI Bullet Enhancement:**
-- ✨ AI button on each bullet point
-- Calls `POST /api/cv/enhance-bullet` with bullet text and job context
-- Replaces bullet with enhanced version using STAR method
-- Loading spinner while enhancing
-
-**Live CV Preview:**
-- Updates in real time as user types
-- Shows formatted CV layout with sections
-- Placeholder message until content is added
-
-**AI Chat Panel:**
-- Always visible in sticky right panel
-- Contextual — knows current CV state (name, target role, experience, skills)
-- Calls Anthropic API directly with full CV context in system prompt
-- Specialised for UK/Ireland STEM CV conventions
-- Enter key to send, loading indicator while waiting
-- Scrolls to latest message automatically
-
-**Routing:**
-- `/build` route updated in `App.tsx` to render `CVBuilder`
+Away for the match. No dev work these days.
 
 ---
 
-### Current Status (4 Mar 2026 — End of Day)
+## Mar 23-25 — Upload CV LLM upgrade
 
-**Completed:**
-- ✅ React Router setup
-- ✅ Upload CV page with job description matching
-- ✅ Job Analysis page (both flows tested)
-- ✅ CV Builder page with live preview and AI chat
-- ✅ All three landing page feature cards navigating correctly
-- ✅ CI passing (backend-tests + frontend-tests)
-- ✅ Backend raw_text fix for accurate match scoring
+Upgraded the Upload CV page job analysis from keyword-based to LLM-powered, same as the Job Analysis page. Now calls both `/api/cv/job/analyze-llm` and `/api/cv/compare` in parallel using `Promise.allSettled`. Added a 30 second timeout so the frontend doesn't hang if the backend stalls.
 
-**Next Steps:**
-- Test CV Builder end to end with real data
-- PDF export functionality for built CV
-- User evaluation preparation (Week 11)
+New results layout when a job description is provided: match score header card, strengths, gaps, recommendations, then the job breakdown, then the parsed CV sections.
 
----
-
-## 6-9 Mar 2026 - LLM Job Analysis Integration
-
-### Job Analysis Page Redesign
-
-**Updated `frontend/src/pages/JobAnalysis.tsx`**
-
-Complete redesign to integrate with new Google Gemini LLM backend endpoint (`POST /api/cv/job/analyze-llm`).
-
-**Major Changes:**
-
-**Backend Integration:**
-- Changed API endpoint from `/api/cv/job/analyze` (keyword-based) to `/api/cv/job/analyze-llm` (LLM-powered)
-- Updated `JobAnalysisResult` TypeScript interface for structured LLM response:
-  - `job_title`, `company`, `tldr`, `employment_type`, `work_model`, `salary`
-  - `experience_level`, `key_requirements`, `nice_to_have`, `tech_stack`, `soft_skills`
-- Removed CV upload flow — now focused solely on job description analysis
-- Added input cleaning (strip newlines, multiple spaces) to prevent JSON parsing issues
-
-**UI Redesign:**
-
-Header Card (Purple Gradient):
-- Displays extracted job title and company name
-- Meta badges for employment type, work model, experience level, salary (if available)
-- "Analyse another" reset button in top-right
-- Icons: Clock (employment), Monitor (work model), Star (experience), DollarSign (salary)
-
-TLDR Section:
-- Plain English summary of what employer is really looking for
-- Purple "TL;DR" badge with green checkmark icon
-- Slate background card with rounded corners
-
-Must-Have Requirements:
-- List of extracted key requirements
-- Green checkmark icon and green accent border
-- Bullet points in clean list format
-
-Tech Stack:
-- Purple badge tags for each technology
-- Wrapped flex layout for responsive display
-- Custom purple accent card with monitor icon
-
-Nice to Have:
-- Cyan badge tags for preferred skills
-- Plus icon with slate accent
-- Clearly separated from must-haves
-
-Soft Skills:
-- Slate badge tags for interpersonal skills
-- Users icon with slate accent
-- Separate section for non-technical requirements
-
-**Design Consistency:**
-- Maintained cyan/purple color scheme from landing page
-- Rounded-3xl cards matching Upload CV and CV Builder pages
-- Smooth transitions and hover effects
-- Responsive layout with proper spacing
-
-**Testing:**
-- Tested with JP Morgan "Lead Software Engineer - Java & React" job description
-- Successfully extracted and displayed:
-  - ✅ Job title: "Lead Software Engineer - Java & React"
-  - ✅ TLDR summary generated
-  - ✅ Must-have requirements (Java/Spring, AWS, SDLC, Microsoft 365, AI integration)
-  - ✅ Tech stack badges (Java, ReactJS, Spring, AWS, Microsoft 365, AI)
-  - ✅ Nice-to-have (ReactJS for web dev, DevOps, AI models)
-  - ✅ Soft skills (Creativity, Communication, Collaboration)
-- Average response time: 2-3 seconds
-- No buffering or timeout issues
-
-**User Flow:**
-1. Paste job description (minimum 50 characters)
-2. Click "Analyse Job" button with search icon
-3. Loading state with spinning icon and "Analysing..." text
-4. Structured results display with all sections
-5. "Analyse another" button to reset for new job
-
-**Error Handling:**
-- Client-side validation for minimum 50 characters
-- Network error handling with clear error messages
-- Red error card with X icon for failed analyses
-- Graceful fallback if LLM returns partial data
-
----
-
-### Current Status (9 Mar 2026)
-
-**Completed:**
-- ✅ Job Analysis page redesigned for LLM integration
-- ✅ Structured output display (job title, company, TLDR, requirements, tech stack, nice-to-have, soft skills)
-- ✅ End-to-end testing with real job descriptions
-- ✅ All frontend features operational
-
-**Next Steps:**
-- CV Builder end-to-end testing with AI enhancement
-- PDF export functionality for built CV
-- User evaluation preparation (Week 11)
-
-## 9-12 Mar 2026 - CV Builder Wizard (Phase 1 & 2)
-
-### CV Builder Page — Complete Rebuild
-
-Rebuilt `frontend/src/pages/CVBuilder.tsx` from scratch as a multi-step wizard.
-Previous version was a single long form — replaced with a guided step-by-step
-flow following supervisor feedback and comparison with Copilot's recommended approach.
-
-**Architecture Decision — Wizard Pattern:**
-- Central `CVFormData` state held in parent `CVBuilder` component
-- Passed down as props to each step — all steps read from and write to same object
-- This means the live preview, chat panel, and all steps share a single source of truth
-- Adding new steps only requires a new entry in `STEPS` array and a `renderStep()` case
-
----
-
-### Phase 1: Wizard Foundation (9-10 Mar 2026)
-
-**Created wizard shell with:**
-- `Stepper` component — horizontal progress indicator with filled connector lines
-- Completed steps show purple gradient tick circle
-- Active step shows purple-bordered white circle
-- `StepPanel` — consistent white card wrapper for each step
-- `NavBar` — Back / step counter / Next buttons
-- `canProceed()` — per-step validation controlling Next button
-
-**Steps added in Phase 1:**
-1. **Personal Info** — full name, email, phone, location (required), LinkedIn, GitHub, website (optional)
-2. **Target Role** — desired job title (required), career focus (optional)
-
-Target Role collected early so it can be passed as context to:
-- AI bullet enhancement (`/api/cv/enhance-bullet`)
-- AI chat panel system prompt
-- Summary step placeholder text
-
-**Routing:**
-- Updated `App.tsx` `onClick` on "Build New CV" card from `console.log` placeholder to `navigate('/build')`
-
----
-
-### Phase 2: Core CV Steps (10-11 Mar 2026)
-
-**Added four new steps:**
-
-3. **Experience** — collapsible entry cards (ExperienceCard)
-   - Each card shows "Job Title · Company" in collapsed header
-   - New cards start open, collapse once filled
-   - Add/remove bullet point responsibilities
-   - AI enhance button (✦) on each bullet — calls `/api/cv/enhance-bullet`
-   - Suggestion shown inline with "Use this" / "Dismiss"
-   - `stopPropagation` on delete button prevents card toggle conflict
-
-4. **Education** — same collapsible card pattern as Experience
-   - Relevant modules as tag chips (type + Enter to add, X to remove)
-
-5. **Skills & Projects** — combined step
-   - Technical skills tag input (purple chips)
-   - Soft skills tag input (cyan chips)
-   - Projects section: title, description textarea, optional link
-   - Projects added after supervisor feedback — sits between Education and Skills in CV
-
-6. **Summary** — textarea placed last intentionally
-   - User has full context to write a meaningful summary by this point
-   - Placeholder adapts to use target job title from Step 2
-
-**Shared UI primitives added:**
-- `Field` — label + input + optional hint, supports `fullWidth` for 2-col grid
-- `Input` — styled text input spread with all HTML input props
-- `TagInput` — reusable tag chip input used for skills and modules
-- `uid()` — random ID generator for Experience/Education/Project entries
-
-**Test results after Phase 2:** 68 tests still passing (no backend changes)
-
----
-
-### Phase 3 (skipped) — Job Tailoring
-
-Deprioritised in favour of building the AI chatbot first, as the chatbot is the
-core differentiator of the project. Job tailoring can be added later as a step.
-
----
-
-## 11-12 Mar 2026 - AI Chat Panel (Phase 5)
-
-### Backend Integration for Frontend Chat
-
-Frontend chat work depended on these backend capabilities:
-- `POST /api/cv/chat` endpoint
-- Request/response models for chat history + contextual CV data
-- `chat_with_cv_context()` returning `reply` and optional `suggested_edit`
-
-Key integration behaviour used by the frontend:
-- Chat history is sent with each request for multi-turn context
-- Full `cv_data` is sent so responses are specific to the current CV
-- `suggested_edit` payloads enable one-click apply in the UI
-
-Stability updates during integration:
-- Removed strict JSON MIME response mode after runtime 503 issues
-- Increased output tokens to reduce truncated assistant responses
-- Restored backend files from `feat/backend-implementation` where needed, then re-applied chat additions
-
----
-
-### Frontend: ChatPanel Component
-
-**Added to `CVBuilder.tsx`:**
-- `ChatMessage` and `SuggestedEdit` TypeScript interfaces
-- `ChatPanel` component — fixed side panel alongside the wizard
-- Chat history lifted to parent `CVBuilder` state so it persists when panel is closed/reopened
-  (Previously stored in `ChatPanel` local state — lost on unmount)
-- Opening chat closes preview and vice versa during wizard (only one panel at a time)
-- After finishing wizard — both panels open simultaneously
-
-**ChatPanel features:**
-- Purple gradient header with Bot icon
-- Greeting message using user's first name and target role if available
-- Suggested prompt chips (only shown before first user message)
-- Message bubbles — user right (purple gradient), assistant left (slate)
-- Typing indicator (3 bouncing dots) while waiting for response
-- Auto-scroll to latest message via `messagesEndRef`
-- Enter to send, Shift+Enter for new line
-
-**Suggested edit card:**
-- Shown below assistant message when `suggested_edit` is returned
-- Displays field label and suggested text in white box
-- "Apply to CV" — calls `applyEdit()` in parent, updates `formData` directly, clears card
-- "Dismiss" — removes card, original text unchanged
-
-**`applyEdit()` in CVBuilder:**
-- `professional_summary` — direct string replace
-- `experience_bullet` — maps over experience array, matches by `exp_id`, replaces bullet at `bullet_index`
-- `skills_add` — spreads new values into existing array, deduplicates with `Set`
-- `project_description` — maps over projects, matches by `project_id`
-
----
-
-### Frontend: CVPreview Component (Phase 4)
-
-**Added to `CVBuilder.tsx`:**
-- Renders `formData` as a real formatted CV document in real time
-- Serif font (Georgia) to match CV document aesthetic
-- Sections: Name + contact details header, Professional Summary, Work Experience, Education, Projects, Skills
-- Empty sections hidden — preview stays clean until data is entered
-- Empty state shown before any data entered (Eye icon with placeholder text)
-- Contact detail row with icons: Mail, Phone, MapPin, Linkedin, Github, Globe
-- Bullet points for responsibilities, module tags for education, project links shown inline
-
-**Toggle behaviour:**
-- "Preview CV" button — outlined style, opens preview
-- "AI Assistant" button — purple gradient, opens chat
-- Only one panel open at a time during wizard
-- `toggleChat` and `togglePreview` helpers close the other panel automatically
-- Exception: after finishing wizard, both open simultaneously side by side
-
----
-
-### Finished View
-
-When user clicks "Finish" on last wizard step:
-- `wizardFinished` state set to `true`
-- Wizard hidden, layout switches to full-width two-column: preview left, chat right
-- Both panels sticky at full viewport height
-- "Back to wizard" button — sets `wizardFinished(false)`, closes preview, leaves chat open
-
----
-
-### Test Suite Updates (12 Mar 2026)
-
-**Updated `test_ai_service.py`:**
-- Rewrote all mocks from OpenAI pattern to Gemini pattern
-  - `mock_client.chat.completions.create` → `mock_client.models.generate_content`
-  - `response.choices[0].message.content` → `response.text`
-- Added `_mock_gemini_response()` helper to avoid repeated mock setup
-- Added 5 new tests for `chat_with_cv_context`:
-  - `test_chat_returns_reply` — success case
-  - `test_chat_includes_conversation_history` — history embedded in prompt
-  - `test_chat_handles_missing_api_key` — no key configured
-  - `test_chat_handles_api_error` — Gemini raises exception
-  - `test_chat_uses_cv_context_in_prompt` — CV data appears in prompt string
-
-**Test results:** 73 passing (was 68, +5 new chat tests)
-
----
-
-### Integration & Environment Alignment (12 Mar 2026)
-
-- Updated frontend API base URLs to use backend port `8010` during debugging/integration (`UploadCV`, `JobAnalysis`, `CVBuilder`) to avoid stale processes on `8000`.
-
----
-
-## 12 Mar 2026 - Tips & Guidance Page
-
-### New Feature: Tips Page
-
-**Created `frontend/src/pages/TipsPage.tsx`**
-
-Static advice page with four tabbed sections and collapsible tip cards.
-
-**Sections:**
-- **CV Writing** — page length, summary, action verbs, tailoring
-- **ATS Advice** — what ATS is, formatting rules, keyword strategy, testing
-- **STAR Method** — Situation, Task, Action, Result explained with examples
-- **Interview Tips** — research, STAR stories, technical rounds, follow-up
-
-**UI:**
-- Tab navigation — each section has its own colour (purple, teal, amber, blue)
-- Collapsible tip cards — title bar with chevron, expands to show description + bullet tips
-- Fixed bug: cards in 2-column grid were appearing to open the wrong card
-  - Fix: changed to single-column layout so each card has its own row
-  - Also added `activeSection` to card keys to force remount on tab switch
-- CTA banner at bottom linking to CV builder and job analysis
-
-**Routing and landing page:**
-- Added `/tips` route to `App.tsx`
-- Added fourth feature card "Tips & Guidance" to landing page grid
-- Card uses `Lightbulb` icon and `variant="purple"`
-- Changed "Analyse Job" card from `variant="teal"` to `variant="purple"`
-
----
-
-## 12 Mar 2026 - Colour Palette Update
-
-### Brand Colour Change: Rebecca Purple (#663399)
-
-Replaced Tailwind's `purple-500` / `violet-600` gradient with Rebecca Purple (`#663399`) as the primary brand colour across the app.
-
-**Files updated:**
-- `FeatureCard.tsx` — button gradient, icon background, feature icon colour
-- `JobAnalysis.tsx` — header card gradient, badge colours, button
-- `CVBuilder.tsx` — stepper, buttons, chat panel header, preview panel header, suggested edit cards
-- `TipsPage.tsx` — tab active state, heading colour, CTA banner
-- `tailwind.config.js` — updated brand colour tokens during iteration
-
-**Approach:** Primary usage was Tailwind arbitrary values (`bg-[#663399]`, `text-[#663399]`) across components, with `tailwind.config.js` also adjusted during iteration to keep brand colour tokens aligned.
-
-**Kept as-is:** `purple-50`, `purple-100`, `purple-200` — light tint backgrounds unchanged as they're subtle and still visually consistent.
-
-## 17-19 Mar 2026 - Travel to Liverpool
-
-- Travelled to Liverpool for a match (17-19 March)
-- No development work during this period
-
-## 23-25 Mar 2026 - Upload CV Page LLM Upgrade
-
-### Upload CV Page — LLM-Powered Job Analysis and CV Comparison
-
-**Updated `frontend/src/pages/UploadCV.tsx`**
-
-Upgraded the job analysis flow from keyword-based matching to full LLM-powered analysis,
-consistent with the Job Analysis page.
-
-**Changes:**
-
-- Replaced `POST /api/cv/job/analyze` (keyword matcher) with `POST /api/cv/job/analyze-llm`
-  for structured job breakdown (TL;DR, must-haves, tech stack, nice-to-have, soft skills)
-- Added `POST /api/cv/compare` call using Gemini to compare the CV against the job description
-  returning: match score (0-100), match summary, strengths, gaps, recommendations, ATS verdict
-- Both LLM calls run in parallel using `Promise.allSettled` — one failing does not block the other
-- Added `fetchWithTimeout` helper (30 seconds) to prevent frontend hanging if backend stalls
-- Added `LLMJobAnalysis` and `CVComparison` TypeScript interfaces
-- Removed old `JobAnalysisResult` interface (keyword-based shape no longer used)
-- Fixed API base URL from port `8010` back to `8000` in `UploadCV.tsx`, `JobAnalysis.tsx`, `CVBuilder.tsx`
-
-**New results layout (when job description provided):**
-1. AI Match Score — gradient header card with %, ATS verdict badge, match summary
-2. Your Strengths — green card, what CV does well for this role
-3. Gaps to Address — amber card, what's missing
-4. Recommendations — numbered list of specific actions
-5. Job breakdown — purple header + TL;DR + Must-haves + Tech Stack + Nice to Have + Soft Skills
-6. Parsed CV sections — Personal Info, Skills, Experience, Education (unchanged)
-
-**Without job description:** Upload and show parsed CV sections only — behaviour unchanged.
-
-**Testing:**
-- Tested with real CV (Kelly's PDF) against Arista Networks Software Engineer Graduate role
-- LLM match score: 65% (Partial Match) — accurate assessment
-- Strengths, gaps, recommendations returned correctly
-- Job breakdown matching Job Analysis page output
-- Fallback to keyword matching confirmed working when Gemini quota exceeded
+Tested with my CV against an Arista Networks graduate role. Got 65% (Partial Match) which seems right. Fixed the API base URL back to port 8000 in UploadCV, JobAnalysis and CVBuilder — had forgotten it was still on 8010.
