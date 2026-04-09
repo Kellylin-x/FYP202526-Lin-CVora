@@ -45,7 +45,7 @@ def _safe_unlink(path: Optional[str]) -> None:
     if path and os.path.exists(path):
         os.unlink(path)
 
-
+# Used when gemini is unavailable
 def _extract_role_hint(job_description: str) -> Optional[str]:
     """Find a role-like phrase using lightweight anchor matching."""
     for raw_line in job_description.splitlines():
@@ -69,7 +69,7 @@ def _extract_role_hint(job_description: str) -> Optional[str]:
     snippet = re.sub(r"^[^A-Za-z]+|[^A-Za-z0-9/()\-\s]+$", "", snippet).strip(" -")
     return snippet if 3 <= len(snippet) <= 90 else None
 
-
+# returns user friendly summary of AI error
 def _summarize_ai_error(ai_error: str) -> str:
     lowered = (ai_error or "").lower()
     if "resource_exhausted" in lowered or "quota" in lowered or "429" in lowered:
@@ -78,7 +78,7 @@ def _summarize_ai_error(ai_error: str) -> str:
         return "AI analysis timed out. Showing keyword-based fallback results."
     return "AI analysis is temporarily unavailable. Showing keyword-based fallback results."
 
-
+# builds keyword based comparison result when gemini unavailable
 def _build_compare_fallback(job_description: str, cv_text: str, ai_error: str = "") -> CVCompareResponse:
     fallback = ats_analyzer.analyze_job_vs_cv(
         job_description=job_description,
@@ -110,7 +110,7 @@ def _build_compare_fallback(job_description: str, cv_text: str, ai_error: str = 
         error=_summarize_ai_error(ai_error)
     )
 
-
+# basic chat response when gemini unavailable
 def _build_enhance_chat_fallback(request: CVEnhanceChatRequest) -> CVEnhanceChatResponse:
     message = (request.message or "").strip().lower()
     gaps = request.gaps or []
@@ -157,12 +157,7 @@ def _build_enhance_chat_fallback(request: CVEnhanceChatRequest) -> CVEnhanceChat
 async def upload_cv(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """
     Upload and parse a CV file (PDF or DOCX)
-    
-    Args:
-        file: Uploaded CV file
-        
-    Returns:
-        Parsed CV data with warnings
+    Returns parsed CV data with warnings
     """
     # Validate file type
     if not file.filename:
@@ -284,12 +279,7 @@ async def enhance_cv_chat(request: CVEnhanceChatRequest):
 async def enhance_bullet_point(request: EnhanceRequest):
     """
     Enhance a single CV bullet point using AI
-    
-    Args:
-        request: Original text and context (job_title, company, etc.)
-        
-    Returns:
-        Enhanced text with improvements analysis
+    Returns enhanced text with improvements analysis
     """
     if not request.text or len(request.text.strip()) < MIN_BULLET_LENGTH:
         raise HTTPException(
@@ -339,12 +329,7 @@ async def enhance_bullet_point(request: EnhanceRequest):
 async def analyze_job_description(request: JobAnalysisRequest):
     """
     Analyze job description and optionally compare with CV
-    
-    Args:
-        request: Job description and optional CV text
-        
-    Returns:
-        Keyword analysis and match score
+    Returns Keyword analysis and match score
     """
     if len(request.job_description) < MIN_JOB_DESCRIPTION_LENGTH:
         raise HTTPException(

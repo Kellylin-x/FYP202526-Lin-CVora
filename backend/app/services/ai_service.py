@@ -16,21 +16,12 @@ except Exception as import_error:
 
 
 class AIService:
-    """
-    AI Service for CV enhancement using Google Gemini API
-    Implements STAR method and UK/Ireland CV best practices
-    """
+    """Handles all Gemini API calls — bullet enhancement, job analysis, CV comparison, chat."""
 
     def __init__(self, api_key: Optional[str] = None):
-        """
-        Initialize AI service with Gemini API key
-
-        Args:
-            api_key: Gemini API key (if None, reads from GEMINI_API_KEY env var)
-        """
+        """Set up the Gemini client. Reads API key from env if not passed in directly."""
         self.api_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY")
         if _GENAI_IMPORT_ERROR is not None:
-
             print(
                 "WARNING: google-genai SDK not available in current interpreter. "
                 f"Python: {sys.executable}. "
@@ -44,7 +35,7 @@ class AIService:
         else:
             # Configure the Gemini client with the API key
             self.client = genai.Client(api_key=self.api_key)
-            self.model = "gemini-3.1-flash-lite-preview"  
+            self.model = "gemini-3.1-flash-lite-preview"
 
         # Max output tokens for bullet point enhancement (short responses only)
         self.max_tokens = 150
@@ -52,18 +43,9 @@ class AIService:
         # Input caps keep prompts responsive and avoid large-token stalls.
         self.max_cv_chars_for_compare = 12000
         self.max_job_chars_for_compare = 6000
-    
+
     def enhance_bullet_point(self, text: str, context: Dict) -> Dict:
-        """
-        Enhance a CV bullet point using STAR method via Gemini
-
-        Args:
-            text: Original bullet point text
-            context: Dictionary with job_title, company, target_role etc.
-
-        Returns:
-            Dictionary with original, enhanced, improvements, confidence
-        """
+        """Takes a CV bullet point and rewrites it using the STAR method via Gemini."""
         if not self.client:
             return {
                 "original": text,
@@ -129,24 +111,15 @@ class AIService:
 
     def chat_with_cv_context(self, message: str, history: list, cv_data: dict) -> dict:
         """
-        Context-aware CV assistant chat using Gemini.
+        CV builder chat — sends the full CV data with every message so the AI
+        can give specific advice rather than generic tips.
 
-        Returns both a conversational reply AND an optional suggested_edit object
-        when the user asks the AI to make a specific change to their CV.
-
-        suggested_edit shapes:
+        Returns a reply and optionally a suggested_edit when the user asks for
+        a direct change. Possible suggested_edit shapes:
           { "field": "professional_summary", "value": "..." }
           { "field": "experience_bullet", "exp_id": "abc123", "bullet_index": 0, "value": "..." }
           { "field": "skills_add", "skill_type": "hard", "values": ["Python", "FastAPI"] }
           { "field": "project_description", "project_id": "xyz789", "value": "..." }
-
-        Args:
-            message:  The user's latest message
-            history:  List of previous messages [{"role": "user"/"assistant", "content": "..."}]
-            cv_data:  The full CVFormData object serialised as a dict
-
-        Returns:
-            Dictionary with 'reply' and optional 'suggested_edit'
         """
         if not self.client:
             return {"error": "AI service not configured (missing API key)"}
@@ -257,24 +230,13 @@ Respond with JSON only:"""
             return {"error": f"AI service error: {str(e)}"}
 
     def analyze_job_description(self, job_description: str) -> Dict:
-        """
-        Analyse a job description using Gemini to produce a structured summary.
-        Returns TL;DR, employment type, remote/hybrid, salary, key requirements etc.
-
-        Args:
-            job_description: Full job description text
-
-        Returns:
-            Dictionary with structured job analysis
-        """
+        """Sends a job description to Gemini and gets back structured data — title, TL;DR, tech stack etc."""
         if not self.client:
             return {"error": "AI service not configured (missing API key)"}
 
-        # Additional validation and cleaning
         if not job_description or len(job_description.strip()) < 10:
             return {"error": "Job description is too short or empty"}
 
-        # Clean the job description
         job_description = job_description.strip()
 
         # Ask Gemini to return structured JSON only — no markdown, no preamble
@@ -337,17 +299,7 @@ Text:
             return {"error": f"Analysis failed: {str(e)}"}
 
     def compare_cv_to_job(self, cv_text: str, job_description: str) -> Dict:
-        """
-        Use Gemini to intelligently compare a CV against a job description.
-        Returns match score, strengths, gaps and actionable recommendations.
-
-        Args:
-            cv_text: Full CV text
-            job_description: Full job description text
-
-        Returns:
-            Dictionary with match analysis
-        """
+        """Compares a CV against a job description using Gemini. Returns match score, strengths, gaps and recommendations."""
         if not self.client:
             return {"error": "AI service not configured (missing API key)"}
 
@@ -428,25 +380,11 @@ Text:
         job_description: str
     ) -> dict:
         """
-        Proactive gap-filling chat for the Upload CV page.
+        Gap-filling chat for the Upload CV page.
 
-        This is different from chat_with_cv_context (which is for the CV builder wizard).
-        Here we already know the gaps from the compare step, so the AI works through
-        them one by one — asking the user questions and turning their answers into
-        ready-to-apply CV bullets, skills, or summary rewrites.
-
-        Args:
-            message:        The user's latest message
-            history:        Previous conversation turns [{"role": ..., "content": ...}]
-            parsed_cv:      The uploaded CV parsed into a dict (personal_info, experience, etc.)
-            gaps:           List of gap strings from compare_cv_to_job (e.g. "No Docker experience")
-            job_description: The job description text
-
-        Returns:
-            Dict with:
-              "reply"              — conversational message to show the user
-              "suggested_addition" — optional dict with type/value/job_title to apply to CV
-              "gap_index"          — which gap (0-based) this reply is addressing (-1 if none)
+        Different from chat_with_cv_context — here we already know the gaps from
+        the compare step, so the AI works through them one by one and turns the
+        user's answers into ready-to-apply bullets, skills, or summary rewrites.
         """
         if not self.client:
             return {"error": "AI service not configured (missing API key)"}
@@ -566,7 +504,7 @@ Return ONLY the JSON object:"""
         return cleaned[:max_chars].rsplit(" ", 1)[0] + " ..."
 
     def _strip_markdown_fences(self, text: str) -> str:
-        """Remove markdown code fences that LLMs may wrap around JSON."""
+        """Remove markdown code fences that LLMs sometimes wrap around JSON."""
         cleaned = text.strip()
         cleaned = re.sub(r'^```json\s*', '', cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r'^```\s*', '', cleaned)
@@ -574,7 +512,7 @@ Return ONLY the JSON object:"""
         return cleaned.strip()
 
     def _extract_json_object(self, text: str) -> Optional[str]:
-        """Extract the first balanced JSON object from mixed text."""
+        """Pull the first complete JSON object out of mixed text by tracking brace depth."""
         start = text.find('{')
         if start == -1:
             return None
@@ -610,7 +548,7 @@ Return ONLY the JSON object:"""
         return None
 
     def _parse_json_response(self, raw_text: str) -> Dict[str, Any]:
-        """Parse LLM output into JSON with extraction fallback."""
+        """Parse LLM output into JSON — tries direct parse first, then strips fences, then extracts."""
         cleaned = self._strip_markdown_fences(raw_text)
 
         try:
@@ -628,7 +566,7 @@ Return ONLY the JSON object:"""
             raise
 
     def _default_job_analysis(self, job_description: str) -> Dict[str, Any]:
-        """Fallback analysis to avoid hard failures when model output is malformed."""
+        """Fallback used when Gemini returns something we can't parse — extracts basics via regex instead."""
         text = ' '.join(job_description.split())
         title_match = re.search(r'(?i)\b([A-Za-z/&\- ]{3,40}(engineer|developer|analyst|manager|architect))\b', text)
         company_match = re.search(r'(?i)\bat\s+([A-Z][A-Za-z0-9&.,\- ]{2,40})', text)
@@ -646,9 +584,9 @@ Return ONLY the JSON object:"""
             "tech_stack": [],
             "soft_skills": []
         }
-    
+
     def _get_system_prompt(self) -> str:
-        """Instructions for bullet point enhancement behaviour"""
+        """System instructions telling Gemini how to behave for bullet enhancement."""
         return """You are an expert CV writer specializing in UK and Ireland STEM roles.
 
 Your task is to improve CV bullet points using these principles:
@@ -666,7 +604,7 @@ CRITICAL RULES:
 - DO maintain the core meaning and facts of the original text"""
 
     def _build_enhancement_prompt(self, text: str, context: Dict) -> str:
-        """Build the user-facing part of the enhancement prompt"""
+        """Builds the actual user prompt for bullet enhancement, injecting the original text and job context."""
         job_title = context.get('job_title', 'a STEM role')
         company = context.get('company', 'a company')
 
@@ -683,9 +621,9 @@ Requirements:
 - DO NOT invent information not in the original
 
 Return ONLY the improved bullet point, nothing else."""
-    
+
     def _clean_ai_output(self, text: str) -> str:
-        """Remove quotes, markdown formatting, and bullet symbols from AI output"""
+        """Strip quotes, markdown bold/italic, and leading bullet characters from AI output."""
         text = text.strip('"\'')
         text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)  # Remove bold markdown
         text = re.sub(r'\*(.+?)\*', r'\1', text)       # Remove italic markdown
@@ -693,7 +631,7 @@ Return ONLY the improved bullet point, nothing else."""
         return text.strip()
 
     def _validate_enhancement(self, original: str, enhanced: str) -> bool:
-        """Check that the enhanced text is valid and usable"""
+        """Check the enhanced text is actually usable — not empty, not too long, not an error message."""
         if not enhanced or len(enhanced.strip()) < 5:
             return False
         if len(enhanced) > 200:
@@ -707,7 +645,7 @@ Return ONLY the improved bullet point, nothing else."""
         return True
 
     def _analyze_improvements(self, original: str, enhanced: str) -> Dict:
-        """Analyse what specific improvements the AI made to the bullet point"""
+        """Check which improvements the AI actually made — action verb, metrics, length, clarity."""
         improvements = {
             "has_action_verb": False,
             "has_measurable_result": False,
@@ -742,7 +680,7 @@ Return ONLY the improved bullet point, nothing else."""
         return improvements
 
     def _calculate_confidence(self, improvements: Dict) -> float:
-        """Calculate an overall confidence score based on improvements made"""
+        """Score 0.0–1.0 based on how many improvements were made. Weighted by importance."""
         weights = {
             "has_action_verb": 0.25,
             "has_measurable_result": 0.35,
