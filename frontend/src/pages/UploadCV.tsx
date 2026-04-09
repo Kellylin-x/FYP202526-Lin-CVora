@@ -1,24 +1,8 @@
-/**
- * UploadCV.tsx
- *
- * Enhance Existing CV page.
- *
- * Flow:
- *   1. User uploads CV (PDF/DOCX)
- *   2. Optionally pastes a job description
- *   3. Two parallel LLM calls:
- *        POST /api/cv/job/analyze-llm  — structured job breakdown
- *        POST /api/cv/compare          — match score, strengths, gaps, recommendations
- *   4. Results shown on left column:
- *        - Match score
- *        - Gap checklist (prominent, ticks off as chat addresses each gap)
- *        - Strengths
- *        - Recommendations
- *        - Job breakdown (TL;DR, must-haves, tech stack, nice-to-have, soft skills)
- *   5. Live CV preview in middle column (updates as enhancements applied)
- *   6. Enhancement chat panel on right — proactively works through gaps one by one
- *        POST /api/cv/enhance-chat
- */
+
+// UploadCV.tsx — Enhance Existing CV page.
+// User uploads a CV, pastes a job description, and gets back a match score,
+// gap checklist, strengths, recommendations, and a job breakdown.
+// Two LLM calls run in parallel (job analysis + CV compare) with keyword fallback if Gemini is unavailable.
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -848,6 +832,7 @@ export const UploadCV: React.FC = () => {
 
         const updated = JSON.parse(JSON.stringify(enhancedCV)) as ParsedCV;
 
+        // Deep copy so we don't mutate the original parsed CV state
         if (addition.type === 'bullet') {
             // Find the best matching experience entry for this bullet
             // First try exact job_title match
@@ -936,6 +921,7 @@ export const UploadCV: React.FC = () => {
                 const cvText = buildComparisonCvText(uploadData.parsed_data, uploadData.raw_text);
                 const notices: string[] = [];
 
+                // Run both LLM calls at the same time — if one fails it doesn't block the other
                 const [jobRes, compareRes] = await Promise.allSettled([
                     fetchWithTimeout(`${API_BASE}/api/cv/job/analyze-llm`, {
                         method: 'POST',

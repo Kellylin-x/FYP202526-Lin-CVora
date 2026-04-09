@@ -803,19 +803,8 @@ const SummaryStep: React.FC<{ data: CVFormData; onChange: (d: CVFormData) => voi
 );
 
 // ── Chat Panel ─────────────────────────────────────────────────────────────
-
-/**
- * ChatPanel is the AI assistant side panel.
- *
- * It receives the full formData as a prop and sends it to the backend
- * with every message, so the AI always has up-to-date CV context.
- *
- * Conversation history is kept locally in the component and sent as
- * the `history` array to maintain multi-turn conversation context.
- *
- * Suggested prompts give the user quick-start options rather than
- * staring at a blank input.
- */
+// AI chat panel — sends full CV data with every message so responses are specific to what's been filled in.
+// Suggested prompts shown before the first message so users aren't staring at a blank box.
 const ChatPanel: React.FC<{
     formData: CVFormData;
     onClose: () => void;
@@ -1029,15 +1018,8 @@ const ChatPanel: React.FC<{
 
 // ── CV Preview Panel ───────────────────────────────────────────────────────
 
-/**
- * CVPreview renders the form data as a real formatted CV document.
- * Updates live as the user types — it reads directly from formData prop.
- *
- * Styled to look like an actual A4 CV with:
- * - Name and contact details at the top
- * - Sections for Summary, Experience, Education, Skills
- * - Empty sections are hidden so the preview stays clean
- */
+// Live CV preview — renders formData as a formatted document in real time.
+// Empty sections are hidden so it doesn't look half-finished while the user is filling things in.
 const CVPreview: React.FC<{ formData: CVFormData; onClose: () => void }> = ({ formData, onClose }) => {
     const { personal_info: p, target_role, professional_summary, experience, education, skills } = formData;
 
